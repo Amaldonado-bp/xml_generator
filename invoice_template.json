@@ -1,0 +1,78 @@
+{
+  "_comment": "Template fixe — modifier uniquement invoice_example.json pour chaque facture",
+
+  "invoice": {
+    "id":                   "INV-001",
+    "issue_date":           "2026-06-12",
+    "due_date":             "",
+    "type_code":            "380",
+    "currency":             "EUR",
+    "buyer_reference":      "5994.staging.test@coupa.com",
+    "buyer_accounting_ref": "",
+    "purchase_order_ref":   "",
+    "sales_order_ref":      "",
+    "contract_ref":         "",
+    "note":                 "",
+    "payment_terms_note":   ""
+  },
+
+  "supplier": {
+    "endpoint_id":     "",
+    "endpoint_scheme": "0088",
+    "name":            "",
+    "address": {
+      "street":            "",
+      "additional_street": "",
+      "city":              "",
+      "postal_zone":       "",
+      "country_code":      "FR"
+    },
+    "vat_id":     "",
+    "company_id": "",
+    "contact": {
+      "name":  "",
+      "phone": "",
+      "email": ""
+    }
+  },
+
+  "buyer": {
+    "endpoint_id":     "672024155",
+    "endpoint_scheme": "0088",
+    "name":            "Lindt Sprungli (France) AG",
+    "address": {
+      "street":            "55 avenue de là-bas",
+      "additional_street": "acheteur ligne 2",
+      "city":              "MA VILLE",
+      "postal_zone":       "06000",
+      "country_code":      "FR"
+    },
+    "vat_id":     "FR33672024155",
+    "company_id": "672024155",
+    "contact": {
+      "name":  "Celine Ponceblanc",
+      "phone": "01 01 25 45 87",
+      "email": "5994.staging.test@coupa.com"
+    }
+  },
+
+  "payment": {
+    "means_code":   "30",
+    "iban":         "",
+    "bic":          "",
+    "account_name": ""
+  },
+
+  "lines": [],
+
+  "totals": {
+    "line_extension": 0,
+    "tax_exclusive":  0,
+    "tax_inclusive":  0,
+    "tax_amount":     0,
+    "payable":        0,
+    "prepaid":        0
+  },
+
+  "vat_breakdown": []
+}
