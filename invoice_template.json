@@ -65,13 +65,17 @@
 
   "lines": [],
 
+  "charges": [],
+
   "totals": {
-    "line_extension": 0,
-    "tax_exclusive":  0,
-    "tax_inclusive":  0,
-    "tax_amount":     0,
-    "payable":        0,
-    "prepaid":        0
+    "line_extension":  0,
+    "allowance_total": 0,
+    "charge_total":    0,
+    "tax_exclusive":   0,
+    "tax_inclusive":   0,
+    "tax_amount":      0,
+    "payable":         0,
+    "prepaid":         0
   },
 
   "vat_breakdown": []

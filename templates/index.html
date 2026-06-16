@@ -8,10 +8,12 @@
   <style>
     body { background: #f0f2f7; }
     .page-header { background: linear-gradient(135deg, #1a56db 0%, #0e9f6e 100%); color: #fff; padding: 1.5rem 2rem; border-radius: .75rem; margin-bottom: 1.5rem; }
+    .page-header.avoir { background: linear-gradient(135deg, #e02424 0%, #c27803 100%); }
     .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.1); border-radius: .6rem; }
     .card-header { background: #fff; font-weight: 600; border-bottom: 2px solid #e9ecef; border-radius: .6rem .6rem 0 0 !important; }
     .card-header .icon { margin-right: .4rem; }
-    #lineItems td, #lineItems th { vertical-align: middle; padding: .3rem .4rem; }
+    #lineItems td, #lineItems th,
+    #chargeItems td, #chargeItems th { vertical-align: middle; padding: .3rem .4rem; }
     .table-lines thead th { font-size: .78rem; white-space: nowrap; background: #f8f9fa; }
     .form-control, .form-select { font-size: .88rem; }
     .form-label { font-size: .83rem; font-weight: 500; margin-bottom: .25rem; color: #495057; }
@@ -22,14 +24,15 @@
     .section-muted { font-size: .78rem; color: #6c757d; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; }
     input.form-control-sm, select.form-select-sm { font-size: .82rem; }
     .vat-cat-help { font-size: .72rem; color: #6c757d; margin-top: .15rem; }
+    .charge-row td { background: #fff9e6; }
   </style>
 </head>
 <body>
 <div class="container-xl py-4">
 
   <!-- Header -->
-  <div class="page-header">
-    <h4 class="mb-0 fw-bold">🧾 Générateur de Factures Électroniques</h4>
+  <div class="page-header" id="pageHeader">
+    <h4 class="mb-0 fw-bold" id="pageTitle">🧾 Générateur de Factures Électroniques</h4>
     <small class="opacity-75">Norme européenne EN16931 — UBL 2.1 / CII D16B (Factur-X)</small>
   </div>
 
@@ -37,12 +40,12 @@
 
     <!-- ══════════════ EN-TÊTE FACTURE ══════════════ -->
     <div class="card mb-3">
-      <div class="card-header"><span class="icon">📄</span>En-tête de la facture</div>
+      <div class="card-header"><span class="icon">📄</span>En-tête du document</div>
       <div class="card-body">
         <div class="row g-3">
           <div class="col-md-3">
-            <label class="form-label">N° facture <span class="badge bg-danger badge-req">BT-1</span></label>
-            <input id="inv_id" class="form-control" required placeholder="FACT-2026-001">
+            <label class="form-label">N° document <span class="badge bg-danger badge-req">BT-1</span></label>
+            <input id="inv_id" class="form-control" required placeholder="FACT-202606-001">
             <div class="invalid-feedback">Obligatoire</div>
           </div>
           <div class="col-md-2">
@@ -56,7 +59,7 @@
           </div>
           <div class="col-md-2">
             <label class="form-label">Type <span class="badge bg-danger badge-req">BT-3</span></label>
-            <select id="inv_type_code" class="form-select">
+            <select id="inv_type_code" class="form-select" onchange="onTypeChange()">
               <option value="380">380 — Facture</option>
               <option value="381">381 — Avoir</option>
               <option value="384">384 — Facture corrective</option>
@@ -265,6 +268,42 @@
       </div>
     </div>
 
+    <!-- ══════════════ FRAIS & REMISES GLOBAUX ══════════════ -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+          <span class="icon">📋</span>Frais &amp; Remises globaux
+          <span class="badge bg-secondary ms-1" style="font-size:.7em">BG-20/BG-21 — optionnel</span>
+        </span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSection('chargeBody', this)">Afficher ▼</button>
+      </div>
+      <div id="chargeBody" style="display:none">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-lines mb-0">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Montant HT</th>
+                <th>Cat. TVA</th>
+                <th>Taux %</th>
+                <th>
+                  <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" onclick="addCharge()">＋</button>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="chargeItems"></tbody>
+          </table>
+        </div>
+        <div class="card-footer py-2">
+          <small class="text-muted">
+            <strong>Frais</strong> = frais de livraison, frais de dossier, etc. (s'ajoutent au HT)&nbsp;|&nbsp;
+            <strong>Remise</strong> = remise commerciale globale (se soustrait du HT)
+          </small>
+        </div>
+      </div>
+    </div>
+
     <!-- ══════════════ LIGNES ══════════════ -->
     <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center">
@@ -281,7 +320,8 @@
               <th title="BT-129">Qté <span class="text-danger">*</span></th>
               <th title="BT-130">Unité</th>
               <th title="BT-146">PU HT</th>
-              <th title="BT-131">Montant HT <span class="text-danger">*</span></th>
+              <th title="BT-140">Remise €</th>
+              <th title="BT-131">Montant HT</th>
               <th title="BT-151">Cat. TVA</th>
               <th title="BT-152">Taux %</th>
               <th title="BT-132">Réf. BC</th>
@@ -330,18 +370,30 @@
         <div class="card h-100">
           <div class="card-header"><span class="icon">🧾</span>Récapitulatif</div>
           <div class="card-body total-box">
-            <div class="d-flex justify-content-between mb-2">
-              <span class="text-muted">Total HT (BT-109)</span>
+            <div class="d-flex justify-content-between mb-1">
+              <span class="text-muted">Total HT lignes <small class="text-muted">(BT-106)</small></span>
               <span id="total_ht" class="fw-semibold">0,00 €</span>
+            </div>
+            <div id="chargeRow" style="display:none" class="d-flex justify-content-between mb-1">
+              <span class="text-muted small">Frais globaux <small>(BT-108)</small></span>
+              <span class="charge-val small fw-semibold text-success">+0,00 €</span>
+            </div>
+            <div id="allowanceRow" style="display:none" class="d-flex justify-content-between mb-1">
+              <span class="text-muted small">Remises globales <small>(BT-107)</small></span>
+              <span class="allowance-val small fw-semibold text-danger">-0,00 €</span>
+            </div>
+            <div id="subtotalRow" style="display:none" class="d-flex justify-content-between mb-2 border-bottom pb-1">
+              <span class="text-muted fw-semibold">Sous-total HT <small>(BT-109)</small></span>
+              <span class="subtotal-val fw-bold">0,00 €</span>
             </div>
             <div id="vatBreakdown"></div>
             <hr class="my-2">
             <div class="d-flex justify-content-between mb-2">
-              <span class="text-muted">Total TTC (BT-112)</span>
+              <span class="text-muted">Total TTC <small class="text-muted">(BT-112)</small></span>
               <span id="total_ttc" class="fw-semibold">0,00 €</span>
             </div>
             <div class="d-flex justify-content-between total-final border-top pt-2 mt-1">
-              <span>Net à payer (BT-115)</span>
+              <span>Net à payer <small>(BT-115)</small></span>
               <span id="total_payable">0,00 €</span>
             </div>
           </div>
@@ -391,12 +443,41 @@
 let lineCount = 0;
 
 window.addEventListener('load', () => {
+  const d  = new Date();
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  document.getElementById('inv_id').value         = `FACT-${yy}${mm}-001`;
   document.getElementById('inv_issue_date').value = today();
-  addLine();
+  addLine({ name: 'Prestation de services', price: 100, qty: 1, vat: 20 });
 });
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+// ── Type de document ──────────────────────────────────────────────────
+function onTypeChange() {
+  const code   = document.getElementById('inv_type_code').value;
+  const header = document.getElementById('pageHeader');
+  const title  = document.getElementById('pageTitle');
+  const labels = {
+    '380': ['🧾 Générateur de Factures Électroniques', false],
+    '381': ['↩️ Générateur d\'Avoirs Électroniques',    true],
+    '384': ['✏️ Générateur de Factures Correctives',    false],
+    '389': ['📋 Générateur de Notes de Débit',          false],
+  };
+  const [text, isAvoir] = labels[code] || labels['380'];
+  title.textContent = text;
+  header.className  = 'page-header' + (isAvoir ? ' avoir' : '');
+  // Mise à jour du préfixe du numéro si c'est encore la valeur auto
+  const idField = document.getElementById('inv_id');
+  const prefix  = { '380': 'FACT', '381': 'AVOIR', '384': 'FACT', '389': 'NOTE' };
+  const d  = new Date();
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  if (/^(FACT|AVOIR|NOTE)-\d{6}-\d+$/.test(idField.value)) {
+    idField.value = `${prefix[code] || 'FACT'}-${yy}${mm}-001`;
+  }
 }
 
 // ── Sections collapsibles ─────────────────────────────────────────────
@@ -413,24 +494,72 @@ function toggleBuyer() {
 function toggleSection(id, btn) {
   const el   = document.getElementById(id);
   const open = el.style.display === 'none';
-  el.style.display  = open ? '' : 'none';
-  btn.textContent   = open ? 'Masquer ▲' : 'Afficher ▼';
+  el.style.display = open ? '' : 'none';
+  btn.textContent  = open ? 'Masquer ▲' : 'Afficher ▼';
+}
+
+// ── Frais & Remises globaux ───────────────────────────────────────────
+function addCharge() {
+  const tbody = document.getElementById('chargeItems');
+  const tr    = document.createElement('tr');
+  tr.className = 'charge-row';
+  tr.innerHTML = `
+    <td>
+      <select class="form-select form-select-sm" name="charge_type" onchange="updateTotals()" style="width:110px">
+        <option value="charge">Frais</option>
+        <option value="allowance">Remise</option>
+      </select>
+    </td>
+    <td><input type="text" class="form-control form-control-sm" name="charge_desc"
+               placeholder="Ex: Frais de livraison" style="min-width:180px"></td>
+    <td><input type="number" class="form-control form-control-sm" name="charge_amount"
+               value="0.00" min="0" step="0.01" oninput="updateTotals()" style="width:100px"></td>
+    <td>
+      <select class="form-select form-select-sm" name="charge_vat_cat" onchange="updateTotals()" style="width:60px">
+        <option value="S">S</option>
+        <option value="Z">Z</option>
+        <option value="E">E</option>
+        <option value="AE">AE</option>
+        <option value="K">K</option>
+        <option value="G">G</option>
+        <option value="O">O</option>
+      </select>
+    </td>
+    <td><input type="number" class="form-control form-control-sm" name="charge_vat_rate"
+               value="20" min="0" max="100" step="0.01" oninput="updateTotals()" style="width:64px"></td>
+    <td>
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCharge(this)">✕</button>
+    </td>`;
+  tbody.appendChild(tr);
+  updateTotals();
+}
+
+function removeCharge(btn) {
+  btn.closest('tr').remove();
+  updateTotals();
 }
 
 // ── Lignes ────────────────────────────────────────────────────────────
-function addLine() {
+function addLine(def = {}) {
   lineCount++;
+  const name  = def.name  !== undefined ? def.name  : '';
+  const price = def.price !== undefined ? def.price : 0;
+  const qty   = def.qty   !== undefined ? def.qty   : 1;
+  const vat   = def.vat   !== undefined ? def.vat   : 20;
+  const disc  = def.disc  !== undefined ? def.disc  : 0;
+  const net   = Math.max(0, qty * price - disc).toFixed(2);
+
   const tbody = document.getElementById('lineItems');
   const tr    = document.createElement('tr');
   tr.innerHTML = `
     <td><input type="number" class="form-control form-control-sm" name="line_id"
                value="${lineCount}" min="1" style="width:48px"></td>
     <td><input type="text" class="form-control form-control-sm" name="line_name"
-               required placeholder="Désignation"></td>
+               value="${name}" required placeholder="Désignation"></td>
     <td><input type="text" class="form-control form-control-sm" name="line_desc"
-               placeholder="(optionnel)" style="min-width:130px"></td>
+               placeholder="(optionnel)" style="min-width:120px"></td>
     <td><input type="number" class="form-control form-control-sm" name="line_qty"
-               value="1" min="0" step="any" oninput="calcLine(this)" style="width:64px"></td>
+               value="${qty}" min="0" step="any" oninput="calcLine(this)" style="width:60px"></td>
     <td>
       <select class="form-select form-select-sm" name="line_unit" style="width:80px">
         <option value="EA">Unité</option>
@@ -445,9 +574,12 @@ function addLine() {
       </select>
     </td>
     <td><input type="number" class="form-control form-control-sm" name="line_unit_price"
-               value="0.00" min="0" step="0.01" oninput="calcLine(this)" style="width:90px"></td>
+               value="${price.toFixed(2)}" min="0" step="0.01" oninput="calcLine(this)" style="width:90px"></td>
+    <td><input type="number" class="form-control form-control-sm" name="line_discount"
+               value="${disc.toFixed(2)}" min="0" step="0.01" oninput="calcLine(this)" style="width:80px"
+               title="Remise sur cette ligne (BT-136)"></td>
     <td><input type="number" class="form-control form-control-sm" name="line_net_amount"
-               value="0.00" step="0.01" oninput="updateTotals()" style="width:90px"></td>
+               value="${net}" step="0.01" oninput="updateTotals()" style="width:90px"></td>
     <td>
       <select class="form-select form-select-sm" name="line_vat_cat"
               onchange="updateTotals()" style="width:60px">
@@ -461,7 +593,7 @@ function addLine() {
       </select>
     </td>
     <td><input type="number" class="form-control form-control-sm" name="line_vat_rate"
-               value="20" min="0" max="100" step="0.01" oninput="updateTotals()" style="width:64px"></td>
+               value="${vat}" min="0" max="100" step="0.01" oninput="updateTotals()" style="width:64px"></td>
     <td><input type="text" class="form-control form-control-sm" name="line_order_ref"
                placeholder="" style="width:75px"></td>
     <td>
@@ -479,10 +611,11 @@ function removeLine(btn) {
 }
 
 function calcLine(el) {
-  const row   = el.closest('tr');
-  const qty   = parseFloat(row.querySelector('[name=line_qty]').value) || 0;
-  const price = parseFloat(row.querySelector('[name=line_unit_price]').value) || 0;
-  row.querySelector('[name=line_net_amount]').value = (qty * price).toFixed(2);
+  const row      = el.closest('tr');
+  const qty      = parseFloat(row.querySelector('[name=line_qty]').value)        || 0;
+  const price    = parseFloat(row.querySelector('[name=line_unit_price]').value) || 0;
+  const discount = parseFloat(row.querySelector('[name=line_discount]').value)   || 0;
+  row.querySelector('[name=line_net_amount]').value = Math.max(0, qty * price - discount).toFixed(2);
   updateTotals();
 }
 
@@ -491,6 +624,7 @@ function updateTotals() {
   let lineExt = 0;
   const groups = {};
 
+  // Lignes
   document.querySelectorAll('#lineItems tr').forEach(row => {
     const net  = parseFloat(row.querySelector('[name=line_net_amount]').value) || 0;
     const cat  = row.querySelector('[name=line_vat_cat]').value;
@@ -501,14 +635,33 @@ function updateTotals() {
     groups[key].taxable += net;
   });
 
+  // Frais & Remises document
+  let chargeTotal = 0, allowanceTotal = 0;
+  document.querySelectorAll('#chargeItems tr').forEach(row => {
+    const isCharge = row.querySelector('[name=charge_type]').value === 'charge';
+    const amt  = parseFloat(row.querySelector('[name=charge_amount]').value) || 0;
+    const cat  = row.querySelector('[name=charge_vat_cat]').value;
+    const rate = parseFloat(row.querySelector('[name=charge_vat_rate]').value) || 0;
+    if (isCharge) chargeTotal += amt;
+    else          allowanceTotal += amt;
+    const key = `${cat}|${rate}`;
+    if (!groups[key]) groups[key] = { cat, rate, taxable: 0, tax: 0 };
+    groups[key].taxable += isCharge ? amt : -amt;
+  });
+
+  chargeTotal    = round2(chargeTotal);
+  allowanceTotal = round2(allowanceTotal);
+  lineExt        = round2(lineExt);
+  const taxExclusive = round2(lineExt - allowanceTotal + chargeTotal);
+
   let taxAmt = 0;
   for (const g of Object.values(groups)) {
-    g.tax   = round2(g.taxable * g.rate / 100);
-    taxAmt += g.tax;
+    g.taxable = round2(g.taxable);
+    g.tax     = round2(g.taxable * g.rate / 100);
+    taxAmt   += g.tax;
   }
-  taxAmt   = round2(taxAmt);
-  lineExt  = round2(lineExt);
-  const taxInc  = round2(lineExt + taxAmt);
+  taxAmt = round2(taxAmt);
+  const taxInc  = round2(taxExclusive + taxAmt);
   const prepaid = parseFloat(document.getElementById('prepaid').value) || 0;
   const payable = round2(taxInc - prepaid);
 
@@ -516,14 +669,30 @@ function updateTotals() {
   document.getElementById('total_ttc').textContent     = fmt(taxInc)  + ' €';
   document.getElementById('total_payable').textContent = fmt(payable) + ' €';
 
-  const vatDiv = document.getElementById('vatBreakdown');
-  vatDiv.innerHTML = Object.values(groups).map(g => `
-    <div class="d-flex justify-content-between small text-muted mb-1">
-      <span>TVA ${g.cat} ${g.rate > 0 ? g.rate + '%' : '(exo.)'} — base ${fmt(g.taxable)} €</span>
-      <span>${fmt(g.tax)} €</span>
-    </div>`).join('');
+  // Lignes charge/remise dans le récap
+  const chargeRow    = document.getElementById('chargeRow');
+  const allowanceRow = document.getElementById('allowanceRow');
+  const subtotalRow  = document.getElementById('subtotalRow');
+  chargeRow.style.display    = chargeTotal > 0    ? '' : 'none';
+  allowanceRow.style.display = allowanceTotal > 0 ? '' : 'none';
+  subtotalRow.style.display  = (chargeTotal > 0 || allowanceTotal > 0) ? '' : 'none';
+  if (chargeTotal > 0)
+    chargeRow.querySelector('.charge-val').textContent = '+' + fmt(chargeTotal) + ' €';
+  if (allowanceTotal > 0)
+    allowanceRow.querySelector('.allowance-val').textContent = '-' + fmt(allowanceTotal) + ' €';
+  subtotalRow.querySelector('.subtotal-val').textContent = fmt(taxExclusive) + ' €';
 
-  window._calc = { lineExt, taxAmt, taxInc, payable, prepaid: round2(prepaid), groups };
+  const vatDiv = document.getElementById('vatBreakdown');
+  vatDiv.innerHTML = Object.values(groups)
+    .filter(g => g.taxable !== 0 || g.tax !== 0)
+    .map(g => `
+      <div class="d-flex justify-content-between small text-muted mb-1">
+        <span>TVA ${g.cat} ${g.rate > 0 ? g.rate + '%' : '(exo.)'} — base ${fmt(g.taxable)} €</span>
+        <span>${fmt(g.tax)} €</span>
+      </div>`).join('');
+
+  window._calc = { lineExt, taxAmt, taxInc, taxExclusive, payable,
+                   prepaid: round2(prepaid), groups, chargeTotal, allowanceTotal };
 }
 
 function fmt(n) {
@@ -540,25 +709,42 @@ function collectData() {
   const lines = [];
   document.querySelectorAll('#lineItems tr').forEach((row, idx) => {
     lines.push({
-      id:             parseInt(row.querySelector('[name=line_id]').value)          || (idx + 1),
+      id:             parseInt(row.querySelector('[name=line_id]').value)           || (idx + 1),
       name:           row.querySelector('[name=line_name]').value.trim(),
       description:    row.querySelector('[name=line_desc]').value.trim(),
-      quantity:       parseFloat(row.querySelector('[name=line_qty]').value)        || 0,
+      quantity:       parseFloat(row.querySelector('[name=line_qty]').value)         || 0,
       unit_code:      row.querySelector('[name=line_unit]').value,
-      unit_price:     parseFloat(row.querySelector('[name=line_unit_price]').value) || 0,
-      net_amount:     parseFloat(row.querySelector('[name=line_net_amount]').value) || 0,
+      unit_price:     parseFloat(row.querySelector('[name=line_unit_price]').value)  || 0,
+      discount:       parseFloat(row.querySelector('[name=line_discount]').value)    || 0,
+      net_amount:     parseFloat(row.querySelector('[name=line_net_amount]').value)  || 0,
       vat_category:   row.querySelector('[name=line_vat_cat]').value,
-      vat_rate:       parseFloat(row.querySelector('[name=line_vat_rate]').value)   || 0,
+      vat_rate:       parseFloat(row.querySelector('[name=line_vat_rate]').value)    || 0,
       order_line_ref: row.querySelector('[name=line_order_ref]').value.trim(),
     });
   });
 
-  const vat_breakdown = Object.values(c.groups || {}).map(g => ({
-    taxable_amount: round2(g.taxable),
-    tax_amount:     round2(g.tax),
-    category:       g.cat,
-    rate:           g.rate,
-  }));
+  const charges = [];
+  document.querySelectorAll('#chargeItems tr').forEach(row => {
+    const amt = parseFloat(row.querySelector('[name=charge_amount]').value) || 0;
+    if (amt > 0) {
+      charges.push({
+        is_charge:    row.querySelector('[name=charge_type]').value === 'charge',
+        description:  row.querySelector('[name=charge_desc]').value.trim(),
+        amount:       amt,
+        vat_category: row.querySelector('[name=charge_vat_cat]').value,
+        vat_rate:     parseFloat(row.querySelector('[name=charge_vat_rate]').value) || 0,
+      });
+    }
+  });
+
+  const vat_breakdown = Object.values(c.groups || {})
+    .filter(g => g.taxable !== 0 || g.tax !== 0)
+    .map(g => ({
+      taxable_amount: round2(g.taxable),
+      tax_amount:     round2(g.tax),
+      category:       g.cat,
+      rate:           g.rate,
+    }));
 
   return {
     _format: fmt,
@@ -610,14 +796,17 @@ function collectData() {
       account_name: v('pay_account_name'),
     },
     lines,
+    charges,
     vat_breakdown,
     totals: {
-      line_extension: c.lineExt  || 0,
-      tax_exclusive:  c.lineExt  || 0,
-      tax_inclusive:  c.taxInc   || 0,
-      tax_amount:     c.taxAmt   || 0,
-      payable:        c.payable  || 0,
-      prepaid:        c.prepaid  || 0,
+      line_extension:  c.lineExt        || 0,
+      allowance_total: c.allowanceTotal || 0,
+      charge_total:    c.chargeTotal    || 0,
+      tax_exclusive:   c.taxExclusive   || 0,
+      tax_inclusive:   c.taxInc         || 0,
+      tax_amount:      c.taxAmt         || 0,
+      payable:         c.payable        || 0,
+      prepaid:         c.prepaid        || 0,
     }
   };
 }
@@ -662,7 +851,7 @@ document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
     alert.style.display = '';
   } finally {
     btn.disabled    = false;
-    btn.textContent = '⬇  Générer et télécharger le XML';
+    btn.textContent = '⬇  Générer et télécharger le XML';
   }
 });
 </script>

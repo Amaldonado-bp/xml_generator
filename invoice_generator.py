@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Générateur de factures EN16931 — UBL 2.1 / CII D16B
-Usage: python invoice_generator.py config.json [--format ubl|cii] [-o sortie.xml]
+Supporte : factures (380), avoirs (381), factures correctives (384), notes de débit (389)
 """
 
 import json
@@ -13,9 +13,10 @@ from xml.etree import ElementTree as ET
 from xml.dom import minidom
 
 # ── Namespaces UBL ────────────────────────────────────────────────────
-_UBL_INV = "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
-_UBL_CAC = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
-_UBL_CBC = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+_UBL_INV    = "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+_UBL_CREDIT = "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
+_UBL_CAC    = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+_UBL_CBC    = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
 
 # ── Namespaces CII ────────────────────────────────────────────────────
 _CII_RSM = "urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
@@ -48,7 +49,15 @@ def _merge(base: dict, override: dict) -> dict:
 # ── Générateur UBL 2.1 ────────────────────────────────────────────────
 
 def build_ubl(d: dict) -> str:
-    ET.register_namespace("",    _UBL_INV)
+    type_code = str(d["invoice"].get("type_code", "380"))
+    is_credit = type_code == "381"
+    doc_ns    = _UBL_CREDIT if is_credit else _UBL_INV
+    root_tag  = "CreditNote"        if is_credit else "Invoice"
+    line_tag  = "CreditNoteLine"    if is_credit else "InvoiceLine"
+    qty_tag   = "CreditedQuantity"  if is_credit else "InvoicedQuantity"
+    type_el   = "CreditNoteTypeCode" if is_credit else "InvoiceTypeCode"
+
+    ET.register_namespace("",    doc_ns)
     ET.register_namespace("cac", _UBL_CAC)
     ET.register_namespace("cbc", _UBL_CBC)
 
@@ -59,18 +68,19 @@ def build_ubl(d: dict) -> str:
     totals   = d["totals"]
     vat      = d.get("vat_breakdown", [])
     payment  = d.get("payment", {})
+    charges  = d.get("charges", [])
     cur      = inv.get("currency", "EUR")
 
     def cac(t): return f"{{{_UBL_CAC}}}{t}"
     def cbc(t): return f"{{{_UBL_CBC}}}{t}"
 
-    root = ET.Element(f"{{{_UBL_INV}}}Invoice")
+    root = ET.Element(f"{{{doc_ns}}}{root_tag}")
 
     # ── En-tête ──────────────────────────────────────────────────────
     _t(root, cbc("CustomizationID"), "urn:cen.eu:en16931:2017")           # BT-24
     _t(root, cbc("ID"),              inv["id"])                            # BT-1
     _t(root, cbc("IssueDate"),       inv["issue_date"])                    # BT-2
-    _t(root, cbc("InvoiceTypeCode"), inv.get("type_code", "380"))          # BT-3
+    _t(root, cbc(type_el),           type_code)                            # BT-3
     if inv.get("note"):
         _t(root, cbc("Note"), inv["note"])                                 # BT-22
     _t(root, cbc("DocumentCurrencyCode"), cur)                             # BT-5
@@ -78,17 +88,15 @@ def build_ubl(d: dict) -> str:
         _t(root, cbc("AccountingCost"), inv["buyer_accounting_ref"])       # BT-19
     _t(root, cbc("BuyerReference"), inv.get("buyer_reference", ""))        # BT-10
 
-    # BT-13 Référence bon de commande
     if inv.get("purchase_order_ref"):
         or_ = ET.SubElement(root, cac("OrderReference"))
-        _t(or_, cbc("ID"), inv["purchase_order_ref"])
+        _t(or_, cbc("ID"), inv["purchase_order_ref"])                      # BT-13
         if inv.get("sales_order_ref"):
             _t(or_, cbc("SalesOrderID"), inv["sales_order_ref"])
 
-    # BT-12 Référence contrat
     if inv.get("contract_ref"):
         cr = ET.SubElement(root, cac("ContractDocumentReference"))
-        _t(cr, cbc("ID"), inv["contract_ref"])
+        _t(cr, cbc("ID"), inv["contract_ref"])                             # BT-12
 
     # ── BG-4 Fournisseur ─────────────────────────────────────────────
     asp = ET.SubElement(root, cac("AccountingSupplierParty"))
@@ -130,7 +138,7 @@ def build_ubl(d: dict) -> str:
     if buyer.get("contact"):
         _ubl_contact(bp, buyer["contact"], cac, cbc)
 
-    # ── BG-16 Moyens de paiement ─────────────────────────────────────
+    # ── BG-16 Paiement ───────────────────────────────────────────────
     if payment.get("means_code"):
         pm = ET.SubElement(root, cac("PaymentMeans"))
         _t(pm, cbc("PaymentMeansCode"), payment["means_code"])
@@ -146,12 +154,25 @@ def build_ubl(d: dict) -> str:
                 fi  = ET.SubElement(fib, cac("FinancialInstitution"))
                 _t(fi, cbc("ID"), payment["bic"])
 
-    # BT-20 Conditions de paiement
     if inv.get("payment_terms_note"):
         pt = ET.SubElement(root, cac("PaymentTerms"))
-        _t(pt, cbc("Note"), inv["payment_terms_note"])
+        _t(pt, cbc("Note"), inv["payment_terms_note"])                     # BT-20
 
-    # ── BG-23 Ventilation TVA ────────────────────────────────────────
+    # ── BG-20/BG-21 Frais & Remises niveau document ──────────────────
+    for ch in charges:
+        is_ch = ch.get("is_charge", True)
+        amt   = float(ch.get("amount", 0))
+        ac = ET.SubElement(root, cac("AllowanceCharge"))
+        _t(ac, cbc("ChargeIndicator"), "true" if is_ch else "false")
+        if ch.get("description"):
+            _t(ac, cbc("AllowanceChargeReason"), ch["description"])
+        _cur(ET.SubElement(ac, cbc("Amount")), amt, cur)
+        tc = ET.SubElement(ac, cac("TaxCategory"))
+        _t(tc, cbc("ID"),      ch.get("vat_category", "S"))
+        _t(tc, cbc("Percent"), str(ch.get("vat_rate", 20)))
+        _t(ET.SubElement(tc, cac("TaxScheme")), cbc("ID"), "VAT")
+
+    # ── BG-23 TVA ────────────────────────────────────────────────────
     tt = ET.SubElement(root, cac("TaxTotal"))
     _cur(ET.SubElement(tt, cbc("TaxAmount")), totals["tax_amount"], cur)
     for v in vat:
@@ -167,25 +188,38 @@ def build_ubl(d: dict) -> str:
 
     # ── BG-22 Totaux document ────────────────────────────────────────
     lmt = ET.SubElement(root, cac("LegalMonetaryTotal"))
-    _cur(ET.SubElement(lmt, cbc("LineExtensionAmount")), totals["line_extension"], cur)
-    _cur(ET.SubElement(lmt, cbc("TaxExclusiveAmount")),  totals["tax_exclusive"],  cur)
-    _cur(ET.SubElement(lmt, cbc("TaxInclusiveAmount")),  totals["tax_inclusive"],  cur)
+    _cur(ET.SubElement(lmt, cbc("LineExtensionAmount")), totals["line_extension"], cur)  # BT-106
+    _cur(ET.SubElement(lmt, cbc("TaxExclusiveAmount")),  totals["tax_exclusive"],  cur)  # BT-109
+    _cur(ET.SubElement(lmt, cbc("TaxInclusiveAmount")),  totals["tax_inclusive"],  cur)  # BT-112
+    if totals.get("allowance_total", 0):
+        _cur(ET.SubElement(lmt, cbc("AllowanceTotalAmount")), totals["allowance_total"], cur)  # BT-107
+    if totals.get("charge_total", 0):
+        _cur(ET.SubElement(lmt, cbc("ChargeTotalAmount")),    totals["charge_total"],    cur)  # BT-108
     if totals.get("prepaid", 0):
-        _cur(ET.SubElement(lmt, cbc("PrepaidAmount")), totals["prepaid"], cur)
-    _cur(ET.SubElement(lmt, cbc("PayableAmount")), totals["payable"], cur)
+        _cur(ET.SubElement(lmt, cbc("PrepaidAmount")), totals["prepaid"], cur)                 # BT-113
+    _cur(ET.SubElement(lmt, cbc("PayableAmount")), totals["payable"], cur)                     # BT-115
 
-    # ── BG-25 Lignes de facture ──────────────────────────────────────
+    # ── BG-25 Lignes ─────────────────────────────────────────────────
     for line in lines:
-        il = ET.SubElement(root, cac("InvoiceLine"))
+        il = ET.SubElement(root, cac(line_tag))
         _t(il, cbc("ID"), str(line["id"]))
         if line.get("note"):
             _t(il, cbc("Note"), line["note"])
-        iq = ET.SubElement(il, cbc("InvoicedQuantity"))
+        iq = ET.SubElement(il, cbc(qty_tag))
         iq.text = str(line["quantity"])
         iq.set("unitCode", line.get("unit_code", "EA"))
         _cur(ET.SubElement(il, cbc("LineExtensionAmount")), line["net_amount"], cur)
         if line.get("order_line_ref"):
             _t(ET.SubElement(il, cac("OrderLineReference")), cbc("LineID"), line["order_line_ref"])
+        # BG-27 Remise sur ligne
+        if float(line.get("discount", 0)) > 0:
+            lac = ET.SubElement(il, cac("AllowanceCharge"))
+            _t(lac, cbc("ChargeIndicator"), "false")
+            _cur(ET.SubElement(lac, cbc("Amount")), line["discount"], cur)
+            ltc = ET.SubElement(lac, cac("TaxCategory"))
+            _t(ltc, cbc("ID"),      line.get("vat_category", "S"))
+            _t(ltc, cbc("Percent"), str(line.get("vat_rate", 20)))
+            _t(ET.SubElement(ltc, cac("TaxScheme")), cbc("ID"), "VAT")
         item = ET.SubElement(il, cac("Item"))
         if line.get("description"):
             _t(item, cbc("Description"), line["description"])
@@ -216,8 +250,8 @@ def _ubl_address(parent, addr, cac, cbc):
 
 def _ubl_contact(parent, contact, cac, cbc):
     c = ET.SubElement(parent, cac("Contact"))
-    if contact.get("name"):  _t(c, cbc("Name"),          contact["name"])
-    if contact.get("phone"): _t(c, cbc("Telephone"),     contact["phone"])
+    if contact.get("name"):  _t(c, cbc("Name"),           contact["name"])
+    if contact.get("phone"): _t(c, cbc("Telephone"),      contact["phone"])
     if contact.get("email"): _t(c, cbc("ElectronicMail"), contact["email"])
 
 
@@ -235,6 +269,7 @@ def build_cii(d: dict) -> str:
     totals   = d["totals"]
     vat      = d.get("vat_breakdown", [])
     payment  = d.get("payment", {})
+    charges  = d.get("charges", [])
     cur      = inv.get("currency", "EUR")
 
     def rsm(t): return f"{{{_CII_RSM}}}{t}"
@@ -286,6 +321,12 @@ def build_cii(d: dict) -> str:
         _t(atax, ram("TypeCode"),              "VAT")
         _t(atax, ram("CategoryCode"),          line.get("vat_category", "S"))
         _t(atax, ram("RateApplicablePercent"), str(line.get("vat_rate", 20)))
+        # Remise sur ligne
+        if float(line.get("discount", 0)) > 0:
+            lch = ET.SubElement(ls, ram("SpecifiedTradeAllowanceCharge"))
+            ind = ET.SubElement(lch, ram("ChargeIndicator"))
+            _t(ind, udt("Indicator"), "false")
+            _t(lch, ram("ActualAmount"), f"{float(line['discount']):.2f}")
         sms = ET.SubElement(ls, ram("SpecifiedTradeSettlementLineMonetarySummation"))
         _t(sms, ram("LineTotalAmount"), f"{float(line['net_amount']):.2f}")
 
@@ -320,7 +361,7 @@ def build_cii(d: dict) -> str:
     if inv.get("contract_ref"):
         _t(ET.SubElement(hta, ram("ContractReferencedDocument")), ram("IssuerAssignedID"), inv["contract_ref"])
 
-    # ApplicableHeaderTradeDelivery (obligatoire dans CII)
+    # ApplicableHeaderTradeDelivery (obligatoire CII)
     ET.SubElement(sctt, ram("ApplicableHeaderTradeDelivery"))
 
     # ApplicableHeaderTradeSettlement
@@ -344,6 +385,20 @@ def build_cii(d: dict) -> str:
         _t(atax, ram("RateApplicablePercent"),  str(v.get("rate", 20)))
         if v.get("exemption_reason"):
             _t(atax, ram("ExemptionReason"), v["exemption_reason"])
+    # Frais & Remises niveau document
+    for ch in charges:
+        is_ch = ch.get("is_charge", True)
+        amt   = float(ch.get("amount", 0))
+        cch = ET.SubElement(hts, ram("SpecifiedTradeAllowanceCharge"))
+        ind = ET.SubElement(cch, ram("ChargeIndicator"))
+        _t(ind, udt("Indicator"), "true" if is_ch else "false")
+        _t(cch, ram("ActualAmount"), f"{amt:.2f}")
+        if ch.get("description"):
+            _t(cch, ram("Reason"), ch["description"])
+        ctax = ET.SubElement(cch, ram("CategoryTradeTax"))
+        _t(ctax, ram("TypeCode"),              "VAT")
+        _t(ctax, ram("CategoryCode"),          ch.get("vat_category", "S"))
+        _t(ctax, ram("RateApplicablePercent"), str(ch.get("vat_rate", 20)))
     if inv.get("payment_terms_note") or inv.get("due_date"):
         spt = ET.SubElement(hts, ram("SpecifiedTradePaymentTerms"))
         if inv.get("payment_terms_note"):
@@ -354,13 +409,17 @@ def build_cii(d: dict) -> str:
             dds.text = inv["due_date"].replace("-", "")
             dds.set("format", "102")
     sms = ET.SubElement(hts, ram("SpecifiedTradeSettlementHeaderMonetarySummation"))
-    _t(sms, ram("LineTotalAmount"),     f"{float(totals['line_extension']):.2f}")
-    _t(sms, ram("TaxBasisTotalAmount"), f"{float(totals['tax_exclusive']):.2f}")
-    _t(sms, ram("TaxTotalAmount"),      f"{float(totals['tax_amount']):.2f}")
-    _t(sms, ram("GrandTotalAmount"),    f"{float(totals['tax_inclusive']):.2f}")
+    _t(sms, ram("LineTotalAmount"),     f"{float(totals['line_extension']):.2f}")  # BT-106
+    if totals.get("charge_total", 0):
+        _t(sms, ram("ChargeTotalAmount"),    f"{float(totals['charge_total']):.2f}")   # BT-108
+    if totals.get("allowance_total", 0):
+        _t(sms, ram("AllowanceTotalAmount"), f"{float(totals['allowance_total']):.2f}") # BT-107
+    _t(sms, ram("TaxBasisTotalAmount"), f"{float(totals['tax_exclusive']):.2f}")   # BT-109
+    _t(sms, ram("TaxTotalAmount"),      f"{float(totals['tax_amount']):.2f}")      # BT-110
+    _t(sms, ram("GrandTotalAmount"),    f"{float(totals['tax_inclusive']):.2f}")   # BT-112
     if totals.get("prepaid", 0):
-        _t(sms, ram("TotalPrepaidAmount"), f"{float(totals['prepaid']):.2f}")
-    _t(sms, ram("DuePayableAmount"), f"{float(totals['payable']):.2f}")
+        _t(sms, ram("TotalPrepaidAmount"), f"{float(totals['prepaid']):.2f}")      # BT-113
+    _t(sms, ram("DuePayableAmount"), f"{float(totals['payable']):.2f}")            # BT-115
 
     return _pretty_xml(root)
 
@@ -441,7 +500,7 @@ Exemples :
     with open(output, "w", encoding="utf-8") as f:
         f.write(xml_str)
 
-    print(f"Facture générée : {output}  ({args.format.upper()})")
+    print(f"Facture generee : {output}  ({args.format.upper()})")
 
 
 if __name__ == "__main__":
