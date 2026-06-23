@@ -3,443 +3,666 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Générateur de Factures EN16931</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <title>France e-invoicing XML assistant - by BearingPoint</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png">
+  <link href="/static/bootstrap.min.css" rel="stylesheet">
   <style>
+    :root {
+      --bp-red:    #FF3D47;
+      --bp-dark:   #1A1A1A;
+      --bp-light:  #FFF0F0;
+    }
     body { background: #f0f2f7; }
-    .page-header { background: linear-gradient(135deg, #1a56db 0%, #0e9f6e 100%); color: #fff; padding: 1.5rem 2rem; border-radius: .75rem; margin-bottom: 1.5rem; }
-    .page-header.avoir { background: linear-gradient(135deg, #e02424 0%, #c27803 100%); }
+    #tab-validator { min-height: calc(100vh - 220px); }
+
+    /* ── Header ── */
+    .page-header {
+      background: var(--bp-dark);
+      color: #fff; padding: 0; border-radius: .75rem; margin-bottom: 0;
+      display: flex; align-items: stretch; gap: 0; overflow: hidden;
+    }
+    /* Bande rouge = fond du titre */
+    .page-header-red {
+      background: var(--bp-red);
+      padding: 1.2rem 1.8rem;
+      display: flex; align-items: center;
+    }
+    .page-header-dark {
+      padding: 1.2rem 2rem;
+      display: flex; flex-direction: column; justify-content: center; flex: 1;
+    }
+    .page-header.avoir .page-header-red { background: #c0001a; }
+
+    /* Logo BearingPoint — filtre blanc sur fond sombre */
+    .bp-logo-img    { height: 32px; filter: brightness(0) invert(1); display: block; }
+    .bp-symbol-img  { height: 40px; filter: brightness(0) invert(1); display: block; }
+
+    /* ── Tabs ── */
+    .main-tabs {
+      background: #fff;
+      border-bottom: 2px solid #dee2e6;
+      padding: 0 1rem;
+      margin-bottom: 1.5rem;
+      border-radius: 0 0 .5rem .5rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,.06);
+    }
+    .main-tabs .nav-link {
+      color: #495057; font-weight: 600; font-size: .95rem;
+      padding: .85rem 1.5rem; border: none; border-bottom: 3px solid transparent;
+      border-radius: 0; margin-bottom: -2px; transition: color .15s, border-color .15s;
+    }
+    .main-tabs .nav-link:hover  { color: var(--bp-red); border-bottom-color: #ffa0a5; }
+    .main-tabs .nav-link.active { color: var(--bp-dark); border-bottom-color: var(--bp-red); background: none; }
+
+    /* ── Cards ── */
     .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.1); border-radius: .6rem; }
-    .card-header { background: #fff; font-weight: 600; border-bottom: 2px solid #e9ecef; border-radius: .6rem .6rem 0 0 !important; }
+    .card-header {
+      background: #fff; font-weight: 600;
+      border-bottom: 2px solid #e9ecef;
+      border-radius: .6rem .6rem 0 0 !important;
+    }
     .card-header .icon { margin-right: .4rem; }
+
+    /* ── Form ── */
     #lineItems td, #lineItems th,
     #chargeItems td, #chargeItems th { vertical-align: middle; padding: .3rem .4rem; }
     .table-lines thead th { font-size: .78rem; white-space: nowrap; background: #f8f9fa; }
     .form-control, .form-select { font-size: .88rem; }
-    .form-label { font-size: .83rem; font-weight: 500; margin-bottom: .25rem; color: #495057; }
-    .badge-req { font-size: .65em; vertical-align: middle; padding: .2em .4em; }
-    .total-box { font-size: 1rem; }
-    .total-box .total-final { font-size: 1.2rem; font-weight: 700; color: #0e9f6e; }
-    .btn-generate { font-size: 1.05rem; padding: .65rem 2.5rem; }
-    .section-muted { font-size: .78rem; color: #6c757d; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; }
+    .form-label  { font-size: .83rem; font-weight: 500; margin-bottom: .25rem; color: #495057; }
+    .badge-req   { font-size: .65em; vertical-align: middle; padding: .2em .4em; }
+    .total-box   { font-size: 1rem; }
+    .total-box .total-final { font-size: 1.2rem; font-weight: 700; color: var(--bp-red); }
+    .btn-generate  { font-size: 1.05rem; padding: .65rem 2.5rem; }
+    .section-muted { font-size: .78rem; color: #6c757d; font-weight: 500;
+                     letter-spacing: .03em; text-transform: uppercase; }
     input.form-control-sm, select.form-select-sm { font-size: .82rem; }
     .vat-cat-help { font-size: .72rem; color: #6c757d; margin-top: .15rem; }
     .charge-row td { background: #fff9e6; }
+
+    /* ── Validator ── */
+    .drop-zone {
+      border: 2.5px dashed #b0bccc;
+      border-radius: .75rem;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      background: #fff;
+      user-select: none;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--bp-red);
+      background: var(--bp-light);
+    }
+    .drop-zone .dz-icon { font-size: 3rem; line-height: 1; margin-bottom: .75rem; }
+    .drop-zone .dz-title { font-size: 1.1rem; font-weight: 600; color: #343a40; }
+    .drop-zone .dz-sub   { font-size: .85rem; color: #6c757d; margin-top: .3rem; }
+    .drop-zone .dz-file  {
+      display: none; margin-top: 1rem; font-size: .9rem; font-weight: 500; color: var(--bp-red);
+    }
+    .drop-zone.has-file .dz-file    { display: block; }
+    .drop-zone.has-file .dz-default { opacity: .45; }
+
+    /* Results panel — visibility managed entirely via JS style.display */
+
+    .result-header {
+      display: flex; align-items: center; flex-wrap: wrap; gap: .6rem;
+      padding: 1rem 1.25rem;
+      border-radius: .6rem .6rem 0 0;
+    }
+    .result-header.valid   { background: #f0fdf4; border-bottom: 2px solid #bbf7d0; }
+    .result-header.invalid { background: #fff5f5; border-bottom: 2px solid #fecaca; }
+
+    .status-badge {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-size: 1rem; font-weight: 700; padding: .3rem .9rem;
+      border-radius: 2rem;
+    }
+    .status-badge.valid   { background: #dcfce7; color: #15803d; }
+    .status-badge.invalid { background: #fee2e2; color: #b91c1c; }
+
+    .fmt-badge {
+      font-size: .78rem; font-weight: 600; padding: .25rem .7rem;
+      border-radius: 2rem; background: #e0e7ff; color: #3730a3;
+    }
+
+    .result-filename {
+      font-size: .9rem; color: #374151; font-weight: 500; font-family: monospace;
+    }
+    .result-counts { font-size: .83rem; color: #6b7280; margin-left: auto; }
+
+    .issue-list { list-style: none; padding: 0; margin: 0; }
+    .issue-item {
+      display: flex; align-items: baseline; gap: .6rem;
+      padding: .55rem .9rem; border-bottom: 1px solid #f3f4f6;
+      font-size: .875rem;
+    }
+    .issue-item:last-child { border-bottom: none; }
+    .issue-code-err  {
+      flex-shrink: 0; font-size: .7rem; font-weight: 700; letter-spacing: .03em;
+      padding: .15em .55em; border-radius: .3rem;
+      background: #fee2e2; color: #b91c1c;
+    }
+    .issue-code-warn {
+      flex-shrink: 0; font-size: .7rem; font-weight: 700; letter-spacing: .03em;
+      padding: .15em .55em; border-radius: .3rem;
+      background: #fef9c3; color: #854d0e;
+    }
+    .issue-msg  { color: #1f2937; }
+    .issue-loc  { font-size: .78rem; color: #9ca3af; font-style: italic; margin-left: .2rem; }
+
+    .section-label {
+      font-size: .7rem; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; padding: .45rem .9rem;
+      background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+      color: #6b7280;
+    }
+    .section-label.err  { color: #b91c1c; background: #fff5f5; }
+    .section-label.warn { color: #92400e; background: #fffbeb; }
+
+    .result-ok {
+      padding: 1.5rem; text-align: center;
+      font-size: 1rem; font-weight: 500; color: #15803d;
+    }
+    .spinner-border-sm { width: 1rem; height: 1rem; }
   </style>
 </head>
 <body>
 <div class="container-xl py-4">
 
-  <!-- Header -->
-  <div class="page-header" id="pageHeader">
-    <h4 class="mb-0 fw-bold" id="pageTitle">🧾 Générateur de Factures Électroniques</h4>
-    <small class="opacity-75">Norme européenne EN16931 — UBL 2.1 / CII D16B (Factur-X)</small>
+  <!-- ══ Header ══════════════════════════════════════════════════════ -->
+  <div class="page-header mb-0" id="pageHeader">
+    <!-- Bande rouge : symbole BearingPoint -->
+    <div class="page-header-red">
+      <img src="/static/BearingPoint_Symbol_Black_RGB.png" class="bp-symbol-img" alt="BearingPoint">
+    </div>
+    <!-- Zone sombre : titre fixe -->
+    <div class="page-header-dark">
+      <h5 class="mb-0 fw-bold" style="color:#fff;font-size:1.05rem;">
+        Générateur de Factures Électroniques - by BearingPoint
+      </h5>
+      <small style="color:rgba(255,255,255,.6);font-size:.78rem;">
+        UBL 2.1 / CII D16B (Factur-X) — Norme EN16931 / AFNOR XP Z12-014
+      </small>
+    </div>
   </div>
 
-  <form id="invoiceForm" novalidate>
+  <!-- ══ Navigation onglets ═══════════════════════════════════════════ -->
+  <div class="main-tabs">
+    <ul class="nav" id="mainTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-gen-btn"
+                data-bs-toggle="tab" data-bs-target="#tab-generator"
+                type="button" role="tab">
+          📄 Générateur XML
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-val-btn"
+                data-bs-toggle="tab" data-bs-target="#tab-validator"
+                type="button" role="tab">
+          ✅ Validateur XML
+        </button>
+      </li>
+    </ul>
+  </div>
 
-    <!-- ══════════════ EN-TÊTE FACTURE ══════════════ -->
-    <div class="card mb-3">
-      <div class="card-header"><span class="icon">📄</span>En-tête du document</div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-3">
-            <label class="form-label">N° document <span class="badge bg-danger badge-req">BT-1</span></label>
-            <input id="inv_id" class="form-control" required placeholder="FACT-202606-001">
-            <div class="invalid-feedback">Obligatoire</div>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Date d'émission <span class="badge bg-danger badge-req">BT-2</span></label>
-            <input id="inv_issue_date" type="date" class="form-control" required>
-            <div class="invalid-feedback">Obligatoire</div>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Date d'échéance <span class="badge bg-secondary badge-req">BT-9</span></label>
-            <input id="inv_due_date" type="date" class="form-control">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Type <span class="badge bg-danger badge-req">BT-3</span></label>
-            <select id="inv_type_code" class="form-select" onchange="onTypeChange()">
-              <option value="380">380 — Facture</option>
-              <option value="381">381 — Avoir</option>
-              <option value="384">384 — Facture corrective</option>
-              <option value="389">389 — Note de débit</option>
-            </select>
-          </div>
-          <div class="col-md-1">
-            <label class="form-label">Devise <span class="badge bg-danger badge-req">BT-5</span></label>
-            <input id="inv_currency" class="form-control" value="EUR" maxlength="3" required>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Réf. acheteur <span class="badge bg-danger badge-req">BT-10</span></label>
-            <input id="inv_buyer_reference" class="form-control" value="{{ template.invoice.buyer_reference }}" required>
-            <div class="invalid-feedback">Obligatoire</div>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">N° bon de commande <span class="badge bg-secondary badge-req">BT-13</span></label>
-            <input id="inv_purchase_order_ref" class="form-control" placeholder="PO-12345">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">N° contrat <span class="badge bg-secondary badge-req">BT-12</span></label>
-            <input id="inv_contract_ref" class="form-control">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Conditions de paiement <span class="badge bg-secondary badge-req">BT-20</span></label>
-            <input id="inv_payment_terms_note" class="form-control" placeholder="30 jours nets">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Note libre <span class="badge bg-secondary badge-req">BT-22</span></label>
-            <input id="inv_note" class="form-control">
+  <div class="tab-content">
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!--  ONGLET 1 — GÉNÉRATEUR                                        -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="tab-pane fade show active" id="tab-generator" role="tabpanel">
+    <form id="invoiceForm" novalidate>
+
+      <!-- ── En-tête facture ── -->
+      <div class="card mb-3">
+        <div class="card-header"><span class="icon">📄</span>En-tête du document</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">N° document <span class="badge bg-danger badge-req">BT-1</span></label>
+              <input id="inv_id" class="form-control" required placeholder="FACT-202606-001">
+              <div class="invalid-feedback">Obligatoire</div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Date d'émission <span class="badge bg-danger badge-req">BT-2</span></label>
+              <input id="inv_issue_date" type="date" class="form-control" required>
+              <div class="invalid-feedback">Obligatoire</div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Date d'échéance <span class="badge bg-secondary badge-req">BT-9</span></label>
+              <input id="inv_due_date" type="date" class="form-control">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Type <span class="badge bg-danger badge-req">BT-3</span></label>
+              <select id="inv_type_code" class="form-select" onchange="onTypeChange()">
+                <option value="380">380 — Facture</option>
+                <option value="381">381 — Avoir</option>
+                <option value="384">384 — Facture corrective</option>
+                <option value="389">389 — Note de débit</option>
+              </select>
+            </div>
+            <div class="col-md-1">
+              <label class="form-label">Devise <span class="badge bg-danger badge-req">BT-5</span></label>
+              <input id="inv_currency" class="form-control" value="EUR" maxlength="3" required>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Réf. acheteur <span class="badge bg-danger badge-req">BT-10</span></label>
+              <input id="inv_buyer_reference" class="form-control" value="{{ template.invoice.buyer_reference }}" required>
+              <div class="invalid-feedback">Obligatoire</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">N° bon de commande <span class="badge bg-secondary badge-req">BT-13</span></label>
+              <input id="inv_purchase_order_ref" class="form-control" placeholder="PO-12345">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">N° contrat <span class="badge bg-secondary badge-req">BT-12</span></label>
+              <input id="inv_contract_ref" class="form-control">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Conditions de paiement <span class="badge bg-secondary badge-req">BT-20</span></label>
+              <input id="inv_payment_terms_note" class="form-control" placeholder="30 jours nets">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Note libre <span class="badge bg-secondary badge-req">BT-22</span></label>
+              <input id="inv_note" class="form-control">
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ══════════════ FOURNISSEUR ══════════════ -->
-    <div class="card mb-3">
-      <div class="card-header"><span class="icon">🏭</span>Fournisseur</div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label">Raison sociale <span class="badge bg-danger badge-req">BT-27</span></label>
-            <input id="sup_name" class="form-control" required placeholder="NOM FOURNISSEUR SAS">
-            <div class="invalid-feedback">Obligatoire</div>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">N° TVA intracommunautaire <span class="badge bg-danger badge-req">BT-31</span></label>
-            <input id="sup_vat_id" class="form-control" required placeholder="FR07433927332">
-            <div class="invalid-feedback">Obligatoire</div>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">SIREN <span class="badge bg-secondary badge-req">BT-30</span></label>
-            <input id="sup_company_id" class="form-control" placeholder="433927332">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">EndpointID (GLN/SIRET) <span class="badge bg-secondary badge-req">BT-34</span></label>
-            <input id="sup_endpoint_id" class="form-control" placeholder="433927332">
-          </div>
+      <!-- ── Fournisseur ── -->
+      <div class="card mb-3">
+        <div class="card-header"><span class="icon">🏭</span>Fournisseur</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Raison sociale <span class="badge bg-danger badge-req">BT-27</span></label>
+              <input id="sup_name" class="form-control" required placeholder="NOM FOURNISSEUR SAS">
+              <div class="invalid-feedback">Obligatoire</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">N° TVA intracommunautaire <span class="badge bg-danger badge-req">BT-31</span></label>
+              <input id="sup_vat_id" class="form-control" required placeholder="FR07433927332">
+              <div class="invalid-feedback">Obligatoire</div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">SIREN <span class="badge bg-secondary badge-req">BT-30</span></label>
+              <input id="sup_company_id" class="form-control" placeholder="433927332">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">EndpointID (GLN/SIRET) <span class="badge bg-secondary badge-req">BT-34</span></label>
+              <input id="sup_endpoint_id" class="form-control" placeholder="433927332">
+            </div>
 
-          <div class="col-12"><div class="section-muted">Adresse</div></div>
-          <div class="col-md-4">
-            <label class="form-label">Adresse ligne 1 <span class="badge bg-danger badge-req">BT-35</span></label>
-            <input id="sup_street" class="form-control" required placeholder="1 rue de la Paix">
-            <div class="invalid-feedback">Obligatoire</div>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Adresse ligne 2 <span class="badge bg-secondary badge-req">BT-36</span></label>
-            <input id="sup_additional_street" class="form-control">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Code postal <span class="badge bg-danger badge-req">BT-38</span></label>
-            <input id="sup_postal_zone" class="form-control" required placeholder="75001">
-            <div class="invalid-feedback">Obligatoire</div>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Ville <span class="badge bg-danger badge-req">BT-37</span></label>
-            <input id="sup_city" class="form-control" required placeholder="PARIS">
-            <div class="invalid-feedback">Obligatoire</div>
-          </div>
-          <div class="col-md-1">
-            <label class="form-label">Pays <span class="badge bg-danger badge-req">BT-40</span></label>
-            <input id="sup_country_code" class="form-control" value="FR" maxlength="2" required>
-          </div>
+            <div class="col-12"><div class="section-muted">Adresse</div></div>
+            <div class="col-md-4">
+              <label class="form-label">Adresse ligne 1 <span class="badge bg-danger badge-req">BT-35</span></label>
+              <input id="sup_street" class="form-control" required placeholder="1 rue de la Paix">
+              <div class="invalid-feedback">Obligatoire</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Adresse ligne 2 <span class="badge bg-secondary badge-req">BT-36</span></label>
+              <input id="sup_additional_street" class="form-control">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Code postal <span class="badge bg-danger badge-req">BT-38</span></label>
+              <input id="sup_postal_zone" class="form-control" required placeholder="75001">
+              <div class="invalid-feedback">Obligatoire</div>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Ville <span class="badge bg-danger badge-req">BT-37</span></label>
+              <input id="sup_city" class="form-control" required placeholder="PARIS">
+              <div class="invalid-feedback">Obligatoire</div>
+            </div>
+            <div class="col-md-1">
+              <label class="form-label">Pays <span class="badge bg-danger badge-req">BT-40</span></label>
+              <input id="sup_country_code" class="form-control" value="FR" maxlength="2" required>
+            </div>
 
-          <div class="col-12"><div class="section-muted mt-1">Contact fournisseur (optionnel)</div></div>
-          <div class="col-md-3">
-            <label class="form-label">Nom contact <span class="badge bg-secondary badge-req">BT-41</span></label>
-            <input id="sup_contact_name" class="form-control">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Téléphone <span class="badge bg-secondary badge-req">BT-42</span></label>
-            <input id="sup_contact_phone" class="form-control" type="tel">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Email <span class="badge bg-secondary badge-req">BT-43</span></label>
-            <input id="sup_contact_email" class="form-control" type="email">
+            <div class="col-12"><div class="section-muted mt-1">Contact fournisseur (optionnel)</div></div>
+            <div class="col-md-3">
+              <label class="form-label">Nom contact <span class="badge bg-secondary badge-req">BT-41</span></label>
+              <input id="sup_contact_name" class="form-control">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Téléphone <span class="badge bg-secondary badge-req">BT-42</span></label>
+              <input id="sup_contact_phone" class="form-control" type="tel">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Email <span class="badge bg-secondary badge-req">BT-43</span></label>
+              <input id="sup_contact_email" class="form-control" type="email">
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ══════════════ ACHETEUR ══════════════ -->
-    <div class="card mb-3">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span><span class="icon">🛒</span>Acheteur <span class="badge bg-success ms-1" style="font-size:.7em">pré-rempli</span></span>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="buyerToggle" onclick="toggleBuyer()">Modifier ▼</button>
-      </div>
-      <div id="buyerSummary" class="card-body py-2 px-3">
-        <small class="text-muted">
-          <strong>{{ template.buyer.name }}</strong>
-          — TVA {{ template.buyer.vat_id }}
-          — {{ template.buyer.address.postal_zone }} {{ template.buyer.address.city }}, {{ template.buyer.address.country_code }}
-        </small>
-      </div>
-      <div id="buyerSection" class="card-body" style="display:none">
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label">Raison sociale <span class="badge bg-danger badge-req">BT-44</span></label>
-            <input id="buy_name" class="form-control" value="{{ template.buyer.name }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">N° TVA <span class="badge bg-secondary badge-req">BT-48</span></label>
-            <input id="buy_vat_id" class="form-control" value="{{ template.buyer.vat_id }}">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">SIREN <span class="badge bg-secondary badge-req">BT-47</span></label>
-            <input id="buy_company_id" class="form-control" value="{{ template.buyer.company_id }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">EndpointID <span class="badge bg-secondary badge-req">BT-49</span></label>
-            <input id="buy_endpoint_id" class="form-control" value="{{ template.buyer.endpoint_id }}">
-          </div>
-
-          <div class="col-12"><div class="section-muted">Adresse</div></div>
-          <div class="col-md-4">
-            <label class="form-label">Adresse ligne 1 <span class="badge bg-secondary badge-req">BT-50</span></label>
-            <input id="buy_street" class="form-control" value="{{ template.buyer.address.street }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Adresse ligne 2 <span class="badge bg-secondary badge-req">BT-51</span></label>
-            <input id="buy_additional_street" class="form-control" value="{{ template.buyer.address.additional_street }}">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Code postal <span class="badge bg-secondary badge-req">BT-53</span></label>
-            <input id="buy_postal_zone" class="form-control" value="{{ template.buyer.address.postal_zone }}">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Ville <span class="badge bg-secondary badge-req">BT-52</span></label>
-            <input id="buy_city" class="form-control" value="{{ template.buyer.address.city }}">
-          </div>
-          <div class="col-md-1">
-            <label class="form-label">Pays <span class="badge bg-secondary badge-req">BT-55</span></label>
-            <input id="buy_country_code" class="form-control" value="{{ template.buyer.address.country_code }}">
-          </div>
-
-          <div class="col-12"><div class="section-muted mt-1">Contact acheteur</div></div>
-          <div class="col-md-3">
-            <label class="form-label">Nom contact</label>
-            <input id="buy_contact_name" class="form-control" value="{{ template.buyer.contact.name }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Téléphone</label>
-            <input id="buy_contact_phone" class="form-control" value="{{ template.buyer.contact.phone }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Email</label>
-            <input id="buy_contact_email" class="form-control" value="{{ template.buyer.contact.email }}">
+      <!-- ── Acheteur ── -->
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><span class="icon">🛒</span>Acheteur <span class="badge bg-success ms-1" style="font-size:.7em">pré-rempli</span></span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="buyerToggle" onclick="toggleBuyer()">Modifier ▼</button>
+        </div>
+        <div id="buyerSummary" class="card-body py-2 px-3">
+          <small class="text-muted">
+            <strong>{{ template.buyer.name }}</strong>
+            — TVA {{ template.buyer.vat_id }}
+            — {{ template.buyer.address.postal_zone }} {{ template.buyer.address.city }}, {{ template.buyer.address.country_code }}
+          </small>
+        </div>
+        <div id="buyerSection" class="card-body" style="display:none">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Raison sociale <span class="badge bg-danger badge-req">BT-44</span></label>
+              <input id="buy_name" class="form-control" value="{{ template.buyer.name }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">N° TVA <span class="badge bg-secondary badge-req">BT-48</span></label>
+              <input id="buy_vat_id" class="form-control" value="{{ template.buyer.vat_id }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">SIREN <span class="badge bg-secondary badge-req">BT-47</span></label>
+              <input id="buy_company_id" class="form-control" value="{{ template.buyer.company_id }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">EndpointID <span class="badge bg-secondary badge-req">BT-49</span></label>
+              <input id="buy_endpoint_id" class="form-control" value="{{ template.buyer.endpoint_id }}">
+            </div>
+            <div class="col-12"><div class="section-muted">Adresse</div></div>
+            <div class="col-md-4">
+              <label class="form-label">Adresse ligne 1 <span class="badge bg-secondary badge-req">BT-50</span></label>
+              <input id="buy_street" class="form-control" value="{{ template.buyer.address.street }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Adresse ligne 2 <span class="badge bg-secondary badge-req">BT-51</span></label>
+              <input id="buy_additional_street" class="form-control" value="{{ template.buyer.address.additional_street }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Code postal <span class="badge bg-secondary badge-req">BT-53</span></label>
+              <input id="buy_postal_zone" class="form-control" value="{{ template.buyer.address.postal_zone }}">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Ville <span class="badge bg-secondary badge-req">BT-52</span></label>
+              <input id="buy_city" class="form-control" value="{{ template.buyer.address.city }}">
+            </div>
+            <div class="col-md-1">
+              <label class="form-label">Pays <span class="badge bg-secondary badge-req">BT-55</span></label>
+              <input id="buy_country_code" class="form-control" value="{{ template.buyer.address.country_code }}">
+            </div>
+            <div class="col-12"><div class="section-muted mt-1">Contact acheteur</div></div>
+            <div class="col-md-3">
+              <label class="form-label">Nom contact</label>
+              <input id="buy_contact_name" class="form-control" value="{{ template.buyer.contact.name }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Téléphone</label>
+              <input id="buy_contact_phone" class="form-control" value="{{ template.buyer.contact.phone }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Email</label>
+              <input id="buy_contact_email" class="form-control" value="{{ template.buyer.contact.email }}">
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ══════════════ PAIEMENT ══════════════ -->
-    <div class="card mb-3">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span><span class="icon">💳</span>Paiement <span class="badge bg-secondary ms-1" style="font-size:.7em">optionnel</span></span>
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSection('paymentBody', this)">Afficher ▼</button>
-      </div>
-      <div id="paymentBody" class="card-body" style="display:none">
-        <div class="row g-3">
-          <div class="col-md-2">
-            <label class="form-label">Mode <span class="badge bg-secondary badge-req">BT-81</span></label>
-            <select id="pay_means_code" class="form-select">
-              <option value="30">30 — Virement</option>
-              <option value="10">10 — Espèces</option>
-              <option value="20">20 — Chèque</option>
-              <option value="48">48 — Carte bancaire</option>
-              <option value="49">49 — Prélèvement SEPA</option>
-              <option value="58">58 — SEPA Credit Transfer</option>
-              <option value="97">97 — Compensation</option>
-            </select>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">IBAN <span class="badge bg-secondary badge-req">BT-84</span></label>
-            <input id="pay_iban" class="form-control" placeholder="FR76 1234 5678 9012 3456 7890 123">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">BIC <span class="badge bg-secondary badge-req">BT-86</span></label>
-            <input id="pay_bic" class="form-control" placeholder="BNPAFRPP">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Nom du compte <span class="badge bg-secondary badge-req">BT-85</span></label>
-            <input id="pay_account_name" class="form-control">
+      <!-- ── Paiement ── -->
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><span class="icon">💳</span>Paiement <span class="badge bg-secondary ms-1" style="font-size:.7em">optionnel</span></span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSection('paymentBody', this)">Afficher ▼</button>
+        </div>
+        <div id="paymentBody" class="card-body" style="display:none">
+          <div class="row g-3">
+            <div class="col-md-2">
+              <label class="form-label">Mode <span class="badge bg-secondary badge-req">BT-81</span></label>
+              <select id="pay_means_code" class="form-select">
+                <option value="30">30 — Virement</option>
+                <option value="10">10 — Espèces</option>
+                <option value="20">20 — Chèque</option>
+                <option value="48">48 — Carte bancaire</option>
+                <option value="49">49 — Prélèvement SEPA</option>
+                <option value="58">58 — SEPA Credit Transfer</option>
+                <option value="97">97 — Compensation</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">IBAN <span class="badge bg-secondary badge-req">BT-84</span></label>
+              <input id="pay_iban" class="form-control" placeholder="FR76 1234 5678 9012 3456 7890 123">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">BIC <span class="badge bg-secondary badge-req">BT-86</span></label>
+              <input id="pay_bic" class="form-control" placeholder="BNPAFRPP">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Nom du compte <span class="badge bg-secondary badge-req">BT-85</span></label>
+              <input id="pay_account_name" class="form-control">
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ══════════════ FRAIS & REMISES GLOBAUX ══════════════ -->
-    <div class="card mb-3">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span>
-          <span class="icon">📋</span>Frais &amp; Remises globaux
-          <span class="badge bg-secondary ms-1" style="font-size:.7em">BG-20/BG-21 — optionnel</span>
-        </span>
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSection('chargeBody', this)">Afficher ▼</button>
+      <!-- ── Frais & Remises globaux ── -->
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>
+            <span class="icon">📋</span>Frais &amp; Remises globaux
+            <span class="badge bg-secondary ms-1" style="font-size:.7em">BG-20/BG-21 — optionnel</span>
+          </span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSection('chargeBody', this)">Afficher ▼</button>
+        </div>
+        <div id="chargeBody" style="display:none">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover table-lines mb-0">
+              <thead>
+                <tr>
+                  <th>Type</th><th>Description</th><th>Montant HT</th>
+                  <th>Cat. TVA</th><th>Taux %</th>
+                  <th><button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" onclick="addCharge()">＋</button></th>
+                </tr>
+              </thead>
+              <tbody id="chargeItems"></tbody>
+            </table>
+          </div>
+          <div class="card-footer py-2">
+            <small class="text-muted">
+              <strong>Frais</strong> = livraison, dossier… (s'ajoutent au HT)&nbsp;|&nbsp;
+              <strong>Remise</strong> = remise commerciale globale (se soustrait du HT)
+            </small>
+          </div>
+        </div>
       </div>
-      <div id="chargeBody" style="display:none">
+
+      <!-- ── Lignes ── -->
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><span class="icon">📦</span>Lignes de facture</span>
+          <button type="button" class="btn btn-sm btn-primary" onclick="addLine()">＋ Ajouter une ligne</button>
+        </div>
         <div class="table-responsive">
           <table class="table table-sm table-hover table-lines mb-0">
             <thead>
               <tr>
-                <th>Type</th>
-                <th>Description</th>
-                <th>Montant HT</th>
-                <th>Cat. TVA</th>
-                <th>Taux %</th>
-                <th>
-                  <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" onclick="addCharge()">＋</button>
-                </th>
+                <th title="BT-126">N°</th>
+                <th title="BT-153">Désignation <span class="text-danger">*</span></th>
+                <th title="BT-154">Description</th>
+                <th title="BT-129">Qté <span class="text-danger">*</span></th>
+                <th title="BT-130">Unité</th>
+                <th title="BT-146">PU HT</th>
+                <th title="BT-140">Remise €</th>
+                <th title="BT-131">Montant HT</th>
+                <th title="BT-151">Cat. TVA</th>
+                <th title="BT-152">Taux %</th>
+                <th title="BT-132">Réf. BC</th>
+                <th></th>
               </tr>
             </thead>
-            <tbody id="chargeItems"></tbody>
+            <tbody id="lineItems"></tbody>
           </table>
         </div>
-        <div class="card-footer py-2">
-          <small class="text-muted">
-            <strong>Frais</strong> = frais de livraison, frais de dossier, etc. (s'ajoutent au HT)&nbsp;|&nbsp;
-            <strong>Remise</strong> = remise commerciale globale (se soustrait du HT)
-          </small>
+        <div class="card-footer">
+          <div class="vat-cat-help">
+            Catégories TVA :&nbsp; <strong>S</strong> Standard &nbsp;|&nbsp;
+            <strong>Z</strong> Taux zéro &nbsp;|&nbsp;
+            <strong>E</strong> Exonéré &nbsp;|&nbsp;
+            <strong>AE</strong> Auto-liquidation &nbsp;|&nbsp;
+            <strong>K</strong> Intra-UE &nbsp;|&nbsp;
+            <strong>G</strong> Export &nbsp;|&nbsp;
+            <strong>O</strong> Hors champ
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- ══════════════ LIGNES ══════════════ -->
-    <div class="card mb-3">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span><span class="icon">📦</span>Lignes de facture</span>
-        <button type="button" class="btn btn-sm btn-primary" onclick="addLine()">＋ Ajouter une ligne</button>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-sm table-hover table-lines mb-0">
-          <thead>
-            <tr>
-              <th title="BT-126">N°</th>
-              <th title="BT-153">Désignation <span class="text-danger">*</span></th>
-              <th title="BT-154">Description</th>
-              <th title="BT-129">Qté <span class="text-danger">*</span></th>
-              <th title="BT-130">Unité</th>
-              <th title="BT-146">PU HT</th>
-              <th title="BT-140">Remise €</th>
-              <th title="BT-131">Montant HT</th>
-              <th title="BT-151">Cat. TVA</th>
-              <th title="BT-152">Taux %</th>
-              <th title="BT-132">Réf. BC</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="lineItems"></tbody>
-        </table>
-      </div>
-      <div class="card-footer">
-        <div class="vat-cat-help">
-          Catégories TVA : <strong>S</strong> = Standard &nbsp;|&nbsp;
-          <strong>Z</strong> = Taux zéro &nbsp;|&nbsp;
-          <strong>E</strong> = Exonéré &nbsp;|&nbsp;
-          <strong>AE</strong> = Auto-liquidation &nbsp;|&nbsp;
-          <strong>K</strong> = Intra-UE &nbsp;|&nbsp;
-          <strong>G</strong> = Export &nbsp;|&nbsp;
-          <strong>O</strong> = Hors champ
-        </div>
-      </div>
-    </div>
-
-    <!-- ══════════════ TOTAUX ══════════════ -->
-    <div class="row mb-3 g-3">
-      <div class="col-md-5">
-        <div class="card h-100">
-          <div class="card-header"><span class="icon">⚙️</span>Options</div>
-          <div class="card-body">
-            <div class="row g-3">
-              <div class="col-md-7">
-                <label class="form-label">Acompte versé <span class="badge bg-secondary badge-req">BT-113</span></label>
-                <div class="input-group">
-                  <input id="prepaid" type="number" class="form-control" value="0" min="0" step="0.01" oninput="updateTotals()">
-                  <span class="input-group-text">€</span>
+      <!-- ── Totaux + Options ── -->
+      <div class="row mb-3 g-3">
+        <div class="col-md-5">
+          <div class="card h-100">
+            <div class="card-header"><span class="icon">⚙️</span>Options</div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-md-7">
+                  <label class="form-label">Acompte versé <span class="badge bg-secondary badge-req">BT-113</span></label>
+                  <div class="input-group">
+                    <input id="prepaid" type="number" class="form-control" value="0" min="0" step="0.01" oninput="updateTotals()">
+                    <span class="input-group-text">€</span>
+                  </div>
+                </div>
+                <div class="col-md-7">
+                  <label class="form-label">Réf. objet facturé <span class="badge bg-secondary badge-req">BT-18</span></label>
+                  <input id="inv_buyer_accounting_ref" class="form-control" placeholder="(optionnel)">
                 </div>
               </div>
-              <div class="col-md-7">
-                <label class="form-label">Réf. objet facturé <span class="badge bg-secondary badge-req">BT-18</span></label>
-                <input id="inv_buyer_accounting_ref" class="form-control" placeholder="(optionnel)">
+            </div>
+          </div>
+        </div>
+        <div class="col-md-7">
+          <div class="card h-100">
+            <div class="card-header"><span class="icon">🧾</span>Récapitulatif</div>
+            <div class="card-body total-box">
+              <div class="d-flex justify-content-between mb-1">
+                <span class="text-muted">Total HT lignes <small>(BT-106)</small></span>
+                <span id="total_ht" class="fw-semibold">0,00 €</span>
+              </div>
+              <div id="chargeRow" style="display:none" class="d-flex justify-content-between mb-1">
+                <span class="text-muted small">Frais globaux <small>(BT-108)</small></span>
+                <span class="charge-val small fw-semibold text-success">+0,00 €</span>
+              </div>
+              <div id="allowanceRow" style="display:none" class="d-flex justify-content-between mb-1">
+                <span class="text-muted small">Remises globales <small>(BT-107)</small></span>
+                <span class="allowance-val small fw-semibold text-danger">-0,00 €</span>
+              </div>
+              <div id="subtotalRow" style="display:none" class="d-flex justify-content-between mb-2 border-bottom pb-1">
+                <span class="text-muted fw-semibold">Sous-total HT <small>(BT-109)</small></span>
+                <span class="subtotal-val fw-bold">0,00 €</span>
+              </div>
+              <div id="vatBreakdown"></div>
+              <hr class="my-2">
+              <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted">Total TTC <small>(BT-112)</small></span>
+                <span id="total_ttc" class="fw-semibold">0,00 €</span>
+              </div>
+              <div class="d-flex justify-content-between total-final border-top pt-2 mt-1">
+                <span>Net à payer <small>(BT-115)</small></span>
+                <span id="total_payable">0,00 €</span>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <div class="col-md-7">
-        <div class="card h-100">
-          <div class="card-header"><span class="icon">🧾</span>Récapitulatif</div>
-          <div class="card-body total-box">
-            <div class="d-flex justify-content-between mb-1">
-              <span class="text-muted">Total HT lignes <small class="text-muted">(BT-106)</small></span>
-              <span id="total_ht" class="fw-semibold">0,00 €</span>
-            </div>
-            <div id="chargeRow" style="display:none" class="d-flex justify-content-between mb-1">
-              <span class="text-muted small">Frais globaux <small>(BT-108)</small></span>
-              <span class="charge-val small fw-semibold text-success">+0,00 €</span>
-            </div>
-            <div id="allowanceRow" style="display:none" class="d-flex justify-content-between mb-1">
-              <span class="text-muted small">Remises globales <small>(BT-107)</small></span>
-              <span class="allowance-val small fw-semibold text-danger">-0,00 €</span>
-            </div>
-            <div id="subtotalRow" style="display:none" class="d-flex justify-content-between mb-2 border-bottom pb-1">
-              <span class="text-muted fw-semibold">Sous-total HT <small>(BT-109)</small></span>
-              <span class="subtotal-val fw-bold">0,00 €</span>
-            </div>
-            <div id="vatBreakdown"></div>
-            <hr class="my-2">
-            <div class="d-flex justify-content-between mb-2">
-              <span class="text-muted">Total TTC <small class="text-muted">(BT-112)</small></span>
-              <span id="total_ttc" class="fw-semibold">0,00 €</span>
-            </div>
-            <div class="d-flex justify-content-between total-final border-top pt-2 mt-1">
-              <span>Net à payer <small>(BT-115)</small></span>
-              <span id="total_payable">0,00 €</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- ══════════════ GÉNÉRER ══════════════ -->
-    <div class="card mb-4">
-      <div class="card-body">
-        <div class="row align-items-center g-3">
-          <div class="col-md-auto">
-            <label class="form-label mb-1 fw-semibold">Format de sortie</label>
-            <div class="d-flex gap-4 mt-1">
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="outputFormat" id="fmt_ubl" value="ubl" checked>
-                <label class="form-check-label" for="fmt_ubl">
-                  <span class="fw-semibold">UBL 2.1</span>
-                  <div class="text-muted" style="font-size:.75em">Coupa, Chorus Pro, ...</div>
-                </label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="outputFormat" id="fmt_cii" value="cii">
-                <label class="form-check-label" for="fmt_cii">
-                  <span class="fw-semibold">CII D16B</span>
-                  <div class="text-muted" style="font-size:.75em">Factur-X / ZUGFeRD</div>
-                </label>
+      <!-- ── Générer ── -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row align-items-center g-3">
+            <div class="col-md-auto">
+              <label class="form-label mb-1 fw-semibold">Format de sortie</label>
+              <div class="d-flex gap-4 mt-1">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="outputFormat" id="fmt_ubl" value="ubl" checked>
+                  <label class="form-check-label" for="fmt_ubl">
+                    <span class="fw-semibold">UBL 2.1</span>
+                    <div class="text-muted" style="font-size:.75em">Coupa, Chorus Pro…</div>
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="outputFormat" id="fmt_cii" value="cii">
+                  <label class="form-check-label" for="fmt_cii">
+                    <span class="fw-semibold">CII D16B</span>
+                    <div class="text-muted" style="font-size:.75em">Factur-X / ZUGFeRD</div>
+                  </label>
+                </div>
               </div>
             </div>
+            <div class="col-md-auto ms-md-auto">
+              <button type="submit" class="btn btn-success btn-generate" id="generateBtn">
+                ⬇&nbsp; Générer et télécharger le XML
+              </button>
+            </div>
           </div>
-          <div class="col-md-auto ms-md-auto">
-            <button type="submit" class="btn btn-success btn-generate" id="generateBtn">
-              ⬇&nbsp; Générer et télécharger le XML
+          <div id="alertMsg" class="mt-3" style="display:none"></div>
+        </div>
+      </div>
+
+    </form>
+    </div><!-- /tab-generator -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!--  ONGLET 2 — VALIDATEUR                                        -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="tab-pane fade" id="tab-validator" role="tabpanel">
+
+      <div class="card mb-3">
+        <div class="card-header"><span class="icon">✅</span>Valider un fichier XML de facture</div>
+        <div class="card-body">
+
+          <!-- Zone de dépôt -->
+          <div class="drop-zone" id="dropZone">
+            <div class="dz-default">
+              <div class="dz-icon">📂</div>
+              <div class="dz-title">Déposez votre fichier XML ici</div>
+              <div class="dz-sub">ou cliquez pour parcourir vos fichiers</div>
+              <div class="dz-sub mt-2" style="font-size:.78rem; color:#9ca3af">
+                Formats supportés : UBL 2.1 (Invoice, CreditNote) · CII D16B (Factur-X, ZUGFeRD)
+              </div>
+            </div>
+            <div class="dz-file" id="dzFileName">
+              <span id="dzFileIcon">📄</span>&nbsp;<span id="dzFileNameText"></span>
+            </div>
+          </div>
+          <input type="file" id="xmlFileInput" accept=".xml,application/xml,text/xml" style="display:none">
+
+          <!-- Bouton valider -->
+          <div class="d-flex align-items-center gap-3 mt-3">
+            <button type="button" class="btn btn-primary px-4" id="validateBtn" onclick="runValidation()" disabled>
+              🔍&nbsp; Valider le fichier
             </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="clearBtn"
+                    onclick="clearValidator()" style="display:none">
+              Effacer
+            </button>
+            <span id="valSpinner" class="d-none">
+              <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+              <span class="text-muted ms-1" style="font-size:.88rem">Validation en cours…</span>
+            </span>
           </div>
+
         </div>
-        <div id="alertMsg" class="mt-3" style="display:none"></div>
       </div>
-    </div>
 
-  </form>
-</div>
+      <!-- ── Résultats ── -->
+      <div id="validationResults" style="display:none"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    </div><!-- /tab-validator -->
+
+  </div><!-- /tab-content -->
+</div><!-- /container -->
+
+<script src="/static/bootstrap.bundle.min.js"></script>
 <script>
-// ── Init ─────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════
+//  ONGLET 1 — GÉNÉRATEUR
+// ════════════════════════════════════════════════════════════════════
 let lineCount = 0;
 
 window.addEventListener('load', () => {
@@ -451,33 +674,26 @@ window.addEventListener('load', () => {
   addLine({ name: 'Prestation de services', price: 100, qty: 1, vat: 20 });
 });
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
+function today() { return new Date().toISOString().slice(0, 10); }
 
-// ── Type de document ──────────────────────────────────────────────────
+// ── Type de document ─────────────────────────────────────────────────
 function onTypeChange() {
-  const code   = document.getElementById('inv_type_code').value;
-  const header = document.getElementById('pageHeader');
-  const title  = document.getElementById('pageTitle');
+  const code = document.getElementById('inv_type_code').value;
   const labels = {
     '380': ['🧾 Générateur de Factures Électroniques', false],
-    '381': ['↩️ Générateur d\'Avoirs Électroniques',    true],
-    '384': ['✏️ Générateur de Factures Correctives',    false],
-    '389': ['📋 Générateur de Notes de Débit',          false],
+    '381': ["↩️ Générateur d'Avoirs Électroniques",   true],
+    '384': ['✏️ Générateur de Factures Correctives',  false],
+    '389': ['📋 Générateur de Notes de Débit',        false],
   };
   const [text, isAvoir] = labels[code] || labels['380'];
-  title.textContent = text;
-  header.className  = 'page-header' + (isAvoir ? ' avoir' : '');
-  // Mise à jour du préfixe du numéro si c'est encore la valeur auto
+  // Titre fixe — on ne le change pas
+  document.getElementById('pageHeader').className  = 'page-header mb-0' + (isAvoir ? ' avoir' : '');
   const idField = document.getElementById('inv_id');
   const prefix  = { '380': 'FACT', '381': 'AVOIR', '384': 'FACT', '389': 'NOTE' };
-  const d  = new Date();
-  const yy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  if (/^(FACT|AVOIR|NOTE)-\d{6}-\d+$/.test(idField.value)) {
-    idField.value = `${prefix[code] || 'FACT'}-${yy}${mm}-001`;
-  }
+  const d = new Date();
+  const yy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0');
+  if (/^(FACT|AVOIR|NOTE)-\d{6}-\d+$/.test(idField.value))
+    idField.value = `${prefix[code]||'FACT'}-${yy}${mm}-001`;
 }
 
 // ── Sections collapsibles ─────────────────────────────────────────────
@@ -490,7 +706,6 @@ function toggleBuyer() {
   summary.style.display = open ? 'none' : '';
   btn.textContent = open ? 'Fermer ▲' : 'Modifier ▼';
 }
-
 function toggleSection(id, btn) {
   const el   = document.getElementById(id);
   const open = el.style.display === 'none';
@@ -498,46 +713,29 @@ function toggleSection(id, btn) {
   btn.textContent  = open ? 'Masquer ▲' : 'Afficher ▼';
 }
 
-// ── Frais & Remises globaux ───────────────────────────────────────────
+// ── Frais & Remises ───────────────────────────────────────────────────
 function addCharge() {
   const tbody = document.getElementById('chargeItems');
   const tr    = document.createElement('tr');
   tr.className = 'charge-row';
   tr.innerHTML = `
-    <td>
-      <select class="form-select form-select-sm" name="charge_type" onchange="updateTotals()" style="width:110px">
-        <option value="charge">Frais</option>
-        <option value="allowance">Remise</option>
-      </select>
-    </td>
+    <td><select class="form-select form-select-sm" name="charge_type" onchange="updateTotals()" style="width:110px">
+      <option value="charge">Frais</option><option value="allowance">Remise</option>
+    </select></td>
     <td><input type="text" class="form-control form-control-sm" name="charge_desc"
                placeholder="Ex: Frais de livraison" style="min-width:180px"></td>
     <td><input type="number" class="form-control form-control-sm" name="charge_amount"
                value="0.00" min="0" step="0.01" oninput="updateTotals()" style="width:100px"></td>
-    <td>
-      <select class="form-select form-select-sm" name="charge_vat_cat" onchange="updateTotals()" style="width:60px">
-        <option value="S">S</option>
-        <option value="Z">Z</option>
-        <option value="E">E</option>
-        <option value="AE">AE</option>
-        <option value="K">K</option>
-        <option value="G">G</option>
-        <option value="O">O</option>
-      </select>
-    </td>
+    <td><select class="form-select form-select-sm" name="charge_vat_cat" onchange="updateTotals()" style="width:60px">
+      <option>S</option><option>Z</option><option>E</option><option>AE</option><option>K</option><option>G</option><option>O</option>
+    </select></td>
     <td><input type="number" class="form-control form-control-sm" name="charge_vat_rate"
                value="20" min="0" max="100" step="0.01" oninput="updateTotals()" style="width:64px"></td>
-    <td>
-      <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCharge(this)">✕</button>
-    </td>`;
+    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeCharge(this)">✕</button></td>`;
   tbody.appendChild(tr);
   updateTotals();
 }
-
-function removeCharge(btn) {
-  btn.closest('tr').remove();
-  updateTotals();
-}
+function removeCharge(btn) { btn.closest('tr').remove(); updateTotals(); }
 
 // ── Lignes ────────────────────────────────────────────────────────────
 function addLine(def = {}) {
@@ -548,7 +746,6 @@ function addLine(def = {}) {
   const vat   = def.vat   !== undefined ? def.vat   : 20;
   const disc  = def.disc  !== undefined ? def.disc  : 0;
   const net   = Math.max(0, qty * price - disc).toFixed(2);
-
   const tbody = document.getElementById('lineItems');
   const tr    = document.createElement('tr');
   tr.innerHTML = `
@@ -560,56 +757,33 @@ function addLine(def = {}) {
                placeholder="(optionnel)" style="min-width:120px"></td>
     <td><input type="number" class="form-control form-control-sm" name="line_qty"
                value="${qty}" min="0" step="any" oninput="calcLine(this)" style="width:60px"></td>
-    <td>
-      <select class="form-select form-select-sm" name="line_unit" style="width:80px">
-        <option value="EA">Unité</option>
-        <option value="HUR">Heure</option>
-        <option value="DAY">Jour</option>
-        <option value="MTQ">m³</option>
-        <option value="KGM">kg</option>
-        <option value="LTR">Litre</option>
-        <option value="MTR">Mètre</option>
-        <option value="XPK">Pack</option>
-        <option value="C62">Pièce</option>
-      </select>
-    </td>
+    <td><select class="form-select form-select-sm" name="line_unit" style="width:80px">
+      <option value="EA">Unité</option><option value="HUR">Heure</option>
+      <option value="DAY">Jour</option><option value="MTQ">m³</option>
+      <option value="KGM">kg</option><option value="LTR">Litre</option>
+      <option value="MTR">Mètre</option><option value="XPK">Pack</option>
+      <option value="C62">Pièce</option>
+    </select></td>
     <td><input type="number" class="form-control form-control-sm" name="line_unit_price"
                value="${price.toFixed(2)}" min="0" step="0.01" oninput="calcLine(this)" style="width:90px"></td>
     <td><input type="number" class="form-control form-control-sm" name="line_discount"
                value="${disc.toFixed(2)}" min="0" step="0.01" oninput="calcLine(this)" style="width:80px"
-               title="Remise sur cette ligne (BT-136)"></td>
+               title="Remise ligne (BT-140)"></td>
     <td><input type="number" class="form-control form-control-sm" name="line_net_amount"
                value="${net}" step="0.01" oninput="updateTotals()" style="width:90px"></td>
-    <td>
-      <select class="form-select form-select-sm" name="line_vat_cat"
-              onchange="updateTotals()" style="width:60px">
-        <option value="S">S</option>
-        <option value="Z">Z</option>
-        <option value="E">E</option>
-        <option value="AE">AE</option>
-        <option value="K">K</option>
-        <option value="G">G</option>
-        <option value="O">O</option>
-      </select>
-    </td>
+    <td><select class="form-select form-select-sm" name="line_vat_cat" onchange="updateTotals()" style="width:60px">
+      <option>S</option><option>Z</option><option>E</option><option>AE</option><option>K</option><option>G</option><option>O</option>
+    </select></td>
     <td><input type="number" class="form-control form-control-sm" name="line_vat_rate"
                value="${vat}" min="0" max="100" step="0.01" oninput="updateTotals()" style="width:64px"></td>
     <td><input type="text" class="form-control form-control-sm" name="line_order_ref"
                placeholder="" style="width:75px"></td>
-    <td>
-      <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLine(this)"
-              title="Supprimer la ligne">✕</button>
-    </td>`;
+    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeLine(this)" title="Supprimer">✕</button></td>`;
   tbody.appendChild(tr);
   tr.querySelector('[name=line_name]').focus();
   updateTotals();
 }
-
-function removeLine(btn) {
-  btn.closest('tr').remove();
-  updateTotals();
-}
-
+function removeLine(btn) { btn.closest('tr').remove(); updateTotals(); }
 function calcLine(el) {
   const row      = el.closest('tr');
   const qty      = parseFloat(row.querySelector('[name=line_qty]').value)        || 0;
@@ -623,37 +797,29 @@ function calcLine(el) {
 function updateTotals() {
   let lineExt = 0;
   const groups = {};
-
-  // Lignes
   document.querySelectorAll('#lineItems tr').forEach(row => {
     const net  = parseFloat(row.querySelector('[name=line_net_amount]').value) || 0;
     const cat  = row.querySelector('[name=line_vat_cat]').value;
-    const rate = parseFloat(row.querySelector('[name=line_vat_rate]').value) || 0;
+    const rate = parseFloat(row.querySelector('[name=line_vat_rate]').value)   || 0;
     lineExt += net;
     const key = `${cat}|${rate}`;
     if (!groups[key]) groups[key] = { cat, rate, taxable: 0, tax: 0 };
     groups[key].taxable += net;
   });
-
-  // Frais & Remises document
   let chargeTotal = 0, allowanceTotal = 0;
   document.querySelectorAll('#chargeItems tr').forEach(row => {
     const isCharge = row.querySelector('[name=charge_type]').value === 'charge';
-    const amt  = parseFloat(row.querySelector('[name=charge_amount]').value) || 0;
+    const amt  = parseFloat(row.querySelector('[name=charge_amount]').value)   || 0;
     const cat  = row.querySelector('[name=charge_vat_cat]').value;
     const rate = parseFloat(row.querySelector('[name=charge_vat_rate]').value) || 0;
-    if (isCharge) chargeTotal += amt;
-    else          allowanceTotal += amt;
+    if (isCharge) chargeTotal += amt; else allowanceTotal += amt;
     const key = `${cat}|${rate}`;
     if (!groups[key]) groups[key] = { cat, rate, taxable: 0, tax: 0 };
     groups[key].taxable += isCharge ? amt : -amt;
   });
-
-  chargeTotal    = round2(chargeTotal);
-  allowanceTotal = round2(allowanceTotal);
-  lineExt        = round2(lineExt);
+  chargeTotal = round2(chargeTotal); allowanceTotal = round2(allowanceTotal);
+  lineExt = round2(lineExt);
   const taxExclusive = round2(lineExt - allowanceTotal + chargeTotal);
-
   let taxAmt = 0;
   for (const g of Object.values(groups)) {
     g.taxable = round2(g.taxable);
@@ -664,40 +830,28 @@ function updateTotals() {
   const taxInc  = round2(taxExclusive + taxAmt);
   const prepaid = parseFloat(document.getElementById('prepaid').value) || 0;
   const payable = round2(taxInc - prepaid);
-
-  document.getElementById('total_ht').textContent      = fmt(lineExt) + ' €';
-  document.getElementById('total_ttc').textContent     = fmt(taxInc)  + ' €';
-  document.getElementById('total_payable').textContent = fmt(payable) + ' €';
-
-  // Lignes charge/remise dans le récap
+  document.getElementById('total_ht').textContent      = fmtEur(lineExt);
+  document.getElementById('total_ttc').textContent     = fmtEur(taxInc);
+  document.getElementById('total_payable').textContent = fmtEur(payable);
   const chargeRow    = document.getElementById('chargeRow');
   const allowanceRow = document.getElementById('allowanceRow');
   const subtotalRow  = document.getElementById('subtotalRow');
   chargeRow.style.display    = chargeTotal > 0    ? '' : 'none';
   allowanceRow.style.display = allowanceTotal > 0 ? '' : 'none';
   subtotalRow.style.display  = (chargeTotal > 0 || allowanceTotal > 0) ? '' : 'none';
-  if (chargeTotal > 0)
-    chargeRow.querySelector('.charge-val').textContent = '+' + fmt(chargeTotal) + ' €';
-  if (allowanceTotal > 0)
-    allowanceRow.querySelector('.allowance-val').textContent = '-' + fmt(allowanceTotal) + ' €';
-  subtotalRow.querySelector('.subtotal-val').textContent = fmt(taxExclusive) + ' €';
-
-  const vatDiv = document.getElementById('vatBreakdown');
-  vatDiv.innerHTML = Object.values(groups)
+  if (chargeTotal > 0)    chargeRow.querySelector('.charge-val').textContent       = '+' + fmtEur(chargeTotal);
+  if (allowanceTotal > 0) allowanceRow.querySelector('.allowance-val').textContent = '-' + fmtEur(allowanceTotal);
+  subtotalRow.querySelector('.subtotal-val').textContent = fmtEur(taxExclusive);
+  document.getElementById('vatBreakdown').innerHTML = Object.values(groups)
     .filter(g => g.taxable !== 0 || g.tax !== 0)
-    .map(g => `
-      <div class="d-flex justify-content-between small text-muted mb-1">
-        <span>TVA ${g.cat} ${g.rate > 0 ? g.rate + '%' : '(exo.)'} — base ${fmt(g.taxable)} €</span>
-        <span>${fmt(g.tax)} €</span>
-      </div>`).join('');
-
+    .map(g => `<div class="d-flex justify-content-between small text-muted mb-1">
+      <span>TVA ${g.cat} ${g.rate > 0 ? g.rate + '%' : '(exo.)'} — base ${fmtEur(g.taxable)}</span>
+      <span>${fmtEur(g.tax)}</span></div>`).join('');
   window._calc = { lineExt, taxAmt, taxInc, taxExclusive, payable,
                    prepaid: round2(prepaid), groups, chargeTotal, allowanceTotal };
 }
 
-function fmt(n) {
-  return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+function fmtEur(n) { return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
 function round2(n) { return Math.round(n * 100) / 100; }
 function v(id)     { return (document.getElementById(id)?.value || '').trim(); }
 
@@ -705,113 +859,71 @@ function v(id)     { return (document.getElementById(id)?.value || '').trim(); }
 function collectData() {
   const c   = window._calc || {};
   const fmt = document.querySelector('input[name=outputFormat]:checked').value;
-
   const lines = [];
   document.querySelectorAll('#lineItems tr').forEach((row, idx) => {
     lines.push({
-      id:             parseInt(row.querySelector('[name=line_id]').value)           || (idx + 1),
+      id:             parseInt(row.querySelector('[name=line_id]').value)          || (idx + 1),
       name:           row.querySelector('[name=line_name]').value.trim(),
       description:    row.querySelector('[name=line_desc]').value.trim(),
-      quantity:       parseFloat(row.querySelector('[name=line_qty]').value)         || 0,
+      quantity:       parseFloat(row.querySelector('[name=line_qty]').value)        || 0,
       unit_code:      row.querySelector('[name=line_unit]').value,
-      unit_price:     parseFloat(row.querySelector('[name=line_unit_price]').value)  || 0,
-      discount:       parseFloat(row.querySelector('[name=line_discount]').value)    || 0,
-      net_amount:     parseFloat(row.querySelector('[name=line_net_amount]').value)  || 0,
+      unit_price:     parseFloat(row.querySelector('[name=line_unit_price]').value) || 0,
+      discount:       parseFloat(row.querySelector('[name=line_discount]').value)   || 0,
+      net_amount:     parseFloat(row.querySelector('[name=line_net_amount]').value) || 0,
       vat_category:   row.querySelector('[name=line_vat_cat]').value,
-      vat_rate:       parseFloat(row.querySelector('[name=line_vat_rate]').value)    || 0,
+      vat_rate:       parseFloat(row.querySelector('[name=line_vat_rate]').value)   || 0,
       order_line_ref: row.querySelector('[name=line_order_ref]').value.trim(),
     });
   });
-
   const charges = [];
   document.querySelectorAll('#chargeItems tr').forEach(row => {
     const amt = parseFloat(row.querySelector('[name=charge_amount]').value) || 0;
-    if (amt > 0) {
-      charges.push({
-        is_charge:    row.querySelector('[name=charge_type]').value === 'charge',
-        description:  row.querySelector('[name=charge_desc]').value.trim(),
-        amount:       amt,
-        vat_category: row.querySelector('[name=charge_vat_cat]').value,
-        vat_rate:     parseFloat(row.querySelector('[name=charge_vat_rate]').value) || 0,
-      });
-    }
+    if (amt > 0) charges.push({
+      is_charge:    row.querySelector('[name=charge_type]').value === 'charge',
+      description:  row.querySelector('[name=charge_desc]').value.trim(),
+      amount:       amt,
+      vat_category: row.querySelector('[name=charge_vat_cat]').value,
+      vat_rate:     parseFloat(row.querySelector('[name=charge_vat_rate]').value) || 0,
+    });
   });
-
   const vat_breakdown = Object.values(c.groups || {})
     .filter(g => g.taxable !== 0 || g.tax !== 0)
-    .map(g => ({
-      taxable_amount: round2(g.taxable),
-      tax_amount:     round2(g.tax),
-      category:       g.cat,
-      rate:           g.rate,
-    }));
-
+    .map(g => ({ taxable_amount: round2(g.taxable), tax_amount: round2(g.tax), category: g.cat, rate: g.rate }));
   return {
     _format: fmt,
     invoice: {
-      id:                   v('inv_id'),
-      issue_date:           v('inv_issue_date'),
-      due_date:             v('inv_due_date'),
-      type_code:            v('inv_type_code'),
-      currency:             v('inv_currency'),
-      buyer_reference:      v('inv_buyer_reference'),
-      buyer_accounting_ref: v('inv_buyer_accounting_ref'),
-      purchase_order_ref:   v('inv_purchase_order_ref'),
-      contract_ref:         v('inv_contract_ref'),
-      note:                 v('inv_note'),
-      payment_terms_note:   v('inv_payment_terms_note'),
+      id: v('inv_id'), issue_date: v('inv_issue_date'), due_date: v('inv_due_date'),
+      type_code: v('inv_type_code'), currency: v('inv_currency'),
+      buyer_reference: v('inv_buyer_reference'), buyer_accounting_ref: v('inv_buyer_accounting_ref'),
+      purchase_order_ref: v('inv_purchase_order_ref'), contract_ref: v('inv_contract_ref'),
+      note: v('inv_note'), payment_terms_note: v('inv_payment_terms_note'),
     },
     supplier: {
-      name:        v('sup_name'),
-      vat_id:      v('sup_vat_id'),
-      company_id:  v('sup_company_id'),
+      name: v('sup_name'), vat_id: v('sup_vat_id'), company_id: v('sup_company_id'),
       endpoint_id: v('sup_endpoint_id'),
-      address: {
-        street:            v('sup_street'),
-        additional_street: v('sup_additional_street'),
-        city:              v('sup_city'),
-        postal_zone:       v('sup_postal_zone'),
-        country_code:      v('sup_country_code'),
-      },
+      address: { street: v('sup_street'), additional_street: v('sup_additional_street'),
+                 city: v('sup_city'), postal_zone: v('sup_postal_zone'), country_code: v('sup_country_code') },
       contact: { name: v('sup_contact_name'), phone: v('sup_contact_phone'), email: v('sup_contact_email') }
     },
     buyer: {
-      name:        v('buy_name'),
-      vat_id:      v('buy_vat_id'),
-      company_id:  v('buy_company_id'),
+      name: v('buy_name'), vat_id: v('buy_vat_id'), company_id: v('buy_company_id'),
       endpoint_id: v('buy_endpoint_id'),
-      address: {
-        street:            v('buy_street'),
-        additional_street: v('buy_additional_street'),
-        city:              v('buy_city'),
-        postal_zone:       v('buy_postal_zone'),
-        country_code:      v('buy_country_code'),
-      },
+      address: { street: v('buy_street'), additional_street: v('buy_additional_street'),
+                 city: v('buy_city'), postal_zone: v('buy_postal_zone'), country_code: v('buy_country_code') },
       contact: { name: v('buy_contact_name'), phone: v('buy_contact_phone'), email: v('buy_contact_email') }
     },
-    payment: {
-      means_code:   v('pay_means_code'),
-      iban:         v('pay_iban'),
-      bic:          v('pay_bic'),
-      account_name: v('pay_account_name'),
-    },
-    lines,
-    charges,
-    vat_breakdown,
+    payment: { means_code: v('pay_means_code'), iban: v('pay_iban'), bic: v('pay_bic'), account_name: v('pay_account_name') },
+    lines, charges, vat_breakdown,
     totals: {
-      line_extension:  c.lineExt        || 0,
-      allowance_total: c.allowanceTotal || 0,
-      charge_total:    c.chargeTotal    || 0,
-      tax_exclusive:   c.taxExclusive   || 0,
-      tax_inclusive:   c.taxInc         || 0,
-      tax_amount:      c.taxAmt         || 0,
-      payable:         c.payable        || 0,
-      prepaid:         c.prepaid        || 0,
+      line_extension:  c.lineExt        || 0, allowance_total: c.allowanceTotal || 0,
+      charge_total:    c.chargeTotal    || 0, tax_exclusive:   c.taxExclusive   || 0,
+      tax_inclusive:   c.taxInc         || 0, tax_amount:      c.taxAmt         || 0,
+      payable:         c.payable        || 0, prepaid:         c.prepaid        || 0,
     }
   };
 }
 
-// ── Soumission ────────────────────────────────────────────────────────
+// ── Soumission formulaire ─────────────────────────────────────────────
 document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
@@ -824,16 +936,24 @@ document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
   const alert = document.getElementById('alertMsg');
   alert.style.display = 'none';
   btn.disabled    = true;
-  btn.textContent = '⏳ Génération en cours...';
+  btn.innerHTML   = '<span class="spinner-border spinner-border-sm me-2"></span>Génération en cours…';
   try {
     const resp = await fetch('/generate', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(collectData()),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collectData()),
     });
+    if (resp.status === 422) {
+      const data = await resp.json();
+      const items = (data.errors || []).map(e => `<li class="mb-1">${escHtml(e)}</li>`).join('');
+      alert.innerHTML = `<div class="alert alert-danger mb-0">
+        <strong>⚠️ Données invalides — corrigez les erreurs suivantes :</strong>
+        <ul class="mb-0 mt-2 ps-3">${items}</ul></div>`;
+      alert.style.display = '';
+      return;
+    }
     if (!resp.ok) {
       const err = await resp.text();
-      alert.innerHTML = `<div class="alert alert-danger mb-0">⚠️ ${err}</div>`;
+      alert.innerHTML = `<div class="alert alert-danger mb-0">⚠️ ${escHtml(err)}</div>`;
       alert.style.display = '';
       return;
     }
@@ -844,16 +964,206 @@ document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
     const a    = document.createElement('a');
     a.href = url; a.download = fn; a.click();
     URL.revokeObjectURL(url);
-    alert.innerHTML = `<div class="alert alert-success mb-0">✅ Fichier téléchargé : <strong>${fn}</strong></div>`;
+    alert.innerHTML = `<div class="alert alert-success mb-0">✅ Fichier téléchargé : <strong>${escHtml(fn)}</strong></div>`;
     alert.style.display = '';
   } catch (err) {
-    alert.innerHTML = `<div class="alert alert-danger mb-0">⚠️ Erreur réseau : ${err.message}</div>`;
+    alert.innerHTML = `<div class="alert alert-danger mb-0">⚠️ Erreur réseau : ${escHtml(err.message)}</div>`;
     alert.style.display = '';
   } finally {
-    btn.disabled    = false;
-    btn.textContent = '⬇  Générer et télécharger le XML';
+    btn.disabled  = false;
+    btn.innerHTML = '⬇&nbsp; Générer et télécharger le XML';
   }
 });
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  ONGLET 2 — VALIDATEUR
+// ════════════════════════════════════════════════════════════════════
+
+// selectedFile conserve le fichier qu'il vienne du drag&drop ou du picker
+let selectedFile = null;
+
+// Initialisation après chargement complet du DOM
+window.addEventListener('load', () => {
+  const dropZone    = document.getElementById('dropZone');
+  const fileInput   = document.getElementById('xmlFileInput');
+  const validateBtn = document.getElementById('validateBtn');
+  const clearBtn    = document.getElementById('clearBtn');
+
+  // ── Drag & drop ──────────────────────────────────────────────────
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('drag-over');
+  });
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length > 0) setFile(e.dataTransfer.files[0]);
+  });
+
+  // ── Clic sur la zone → ouvre le sélecteur de fichier ─────────────
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  // ── Sélection via le picker natif ────────────────────────────────
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) setFile(fileInput.files[0]);
+  });
+});
+
+function setFile(file) {
+  selectedFile = file;                    // stocke la référence File
+  document.getElementById('dzFileNameText').textContent = file.name;
+  document.getElementById('dropZone').classList.add('has-file');
+  document.getElementById('validateBtn').disabled = false;
+  document.getElementById('clearBtn').style.display = '';
+  document.getElementById('validationResults').innerHTML = '';
+  document.getElementById('validationResults').style.display = 'none';
+}
+
+function clearValidator() {
+  selectedFile = null;
+  document.getElementById('xmlFileInput').value = '';
+  document.getElementById('dropZone').classList.remove('has-file');
+  document.getElementById('dzFileNameText').textContent = '';
+  document.getElementById('validateBtn').disabled = true;
+  document.getElementById('clearBtn').style.display = 'none';
+  document.getElementById('validationResults').innerHTML = '';
+  document.getElementById('validationResults').style.display = 'none';
+}
+
+async function runValidation() {
+  if (!selectedFile) return;
+
+  const spinner     = document.getElementById('valSpinner');
+  const results     = document.getElementById('validationResults');
+  const validateBtn = document.getElementById('validateBtn');
+
+  validateBtn.disabled = true;
+  spinner.classList.remove('d-none');
+  results.style.display = 'none';
+  results.innerHTML = '';
+
+  try {
+    const fd = new FormData();
+    fd.append('file', selectedFile, selectedFile.name);
+    const resp = await fetch('/validate', { method: 'POST', body: fd });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(`Serveur : ${txt}`);
+    }
+    const data = await resp.json();
+    console.log('[validator] data reçu:', data);
+    renderResults(data);
+    console.log('[validator] display après renderResults:', results.style.display);
+  } catch (err) {
+    console.error('[validator] erreur:', err);
+    results.innerHTML = `<div class="alert alert-danger">⚠️ ${escHtml(err.message)}</div>`;
+    results.style.display = 'block';
+  } finally {
+    validateBtn.disabled = false;
+    spinner.classList.add('d-none');
+  }
+}
+
+function renderResults(data) {
+  const results = document.getElementById('validationResults');
+  const errors  = data.errors   || [];
+  const warns   = data.warnings || [];
+  const isValid = data.valid;
+
+  const fmtLabel = data.format === 'UBL' ? 'UBL 2.1'
+                 : data.format === 'CII' ? 'CII D16B'
+                 : 'Format inconnu';
+
+  const errCount  = errors.length;
+  const warnCount = warns.length;
+  const countStr  = `${errCount} erreur${errCount !== 1 ? 's' : ''} · ${warnCount} avertissement${warnCount !== 1 ? 's' : ''}`;
+
+  let html = `
+  <div class="card">
+    <div class="result-header ${isValid ? 'valid' : 'invalid'}">
+      <span class="status-badge ${isValid ? 'valid' : 'invalid'}">
+        ${isValid ? '✓ VALIDE' : '✗ NON CONFORME'}
+      </span>
+      <span class="fmt-badge">${escHtml(fmtLabel)}</span>
+      <span class="result-filename">📄 ${escHtml(data.filename || '')}</span>
+      <span class="result-counts">${countStr}</span>
+    </div>`;
+
+  if (!isValid || warnCount > 0) {
+    html += `<div class="card-body p-0">`;
+
+    if (errCount > 0) {
+      html += `<div class="section-label err">Erreurs (${errCount})</div>
+               <ul class="issue-list">`;
+      for (const e of errors) {
+        const loc = e.location ? `<span class="issue-loc">[${escHtml(e.location)}]</span>` : '';
+        html += `<li class="issue-item">
+                   <span class="issue-code-err">${escHtml(e.code)}</span>
+                   <span class="issue-msg">${escHtml(e.message)}${loc}</span>
+                 </li>`;
+      }
+      html += `</ul>`;
+    }
+
+    if (warnCount > 0) {
+      html += `<div class="section-label warn">Avertissements (${warnCount})</div>
+               <ul class="issue-list">`;
+      for (const w of warns) {
+        const loc = w.location ? `<span class="issue-loc">[${escHtml(w.location)}]</span>` : '';
+        html += `<li class="issue-item">
+                   <span class="issue-code-warn">${escHtml(w.code)}</span>
+                   <span class="issue-msg">${escHtml(w.message)}${loc}</span>
+                 </li>`;
+      }
+      html += `</ul>`;
+    }
+
+    html += `</div>`;
+  } else {
+    html += `<div class="result-ok">
+      ✅ Aucune anomalie détectée. La facture est conforme à la norme EN16931 / AFNOR XP Z12-014.
+    </div>`;
+  }
+
+  html += `</div>`;
+  results.innerHTML = html;
+  results.style.display = 'block';
+  console.log('[validator] results.style.display =', results.style.display, '| offsetParent:', results.offsetParent);
+  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 </script>
+
+<!-- ══ Footer BearingPoint ══════════════════════════════════════════ -->
+<footer style="
+  margin-top: 3rem;
+  background: #1A1A1A;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  flex-wrap: wrap;
+">
+  <div style="background:#FF3D47;padding:.9rem 1.4rem;display:flex;align-items:center;">
+    <img src="/static/BearingPoint_Symbol_Black_RGB.png"
+         style="height:22px;filter:brightness(0) invert(1);" alt="BearingPoint">
+  </div>
+  <div style="padding:.9rem 1.6rem;display:flex;align-items:center;gap:2rem;flex:1;flex-wrap:wrap;">
+    <img src="/static/BearingPoint_Logotype_Black_RGB.png"
+         style="height:18px;filter:brightness(0) invert(1);" alt="BearingPoint">
+    <span style="color:rgba(255,255,255,.5);font-size:.78rem;">
+      © 2026 BearingPoint GmbH. Tous droits réservés.
+    </span>
+    <span style="color:rgba(255,255,255,.3);font-size:.73rem;margin-left:auto;">
+      EN16931 · AFNOR XP Z12-014 · Factur-X
+    </span>
+  </div>
+</footer>
+
 </body>
 </html>

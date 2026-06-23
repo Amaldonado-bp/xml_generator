@@ -5,9 +5,11 @@ Supporte : factures (380), avoirs (381), factures correctives (384), notes de d�
 """
 
 import json
+import re
 import sys
 import argparse
 from copy import deepcopy
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from xml.etree import ElementTree as ET
 from xml.dom import minidom
@@ -24,6 +26,160 @@ _CII_RAM = "urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInforma
 _CII_UDT = "urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"
 
 TEMPLATE_PATH = Path(__file__).parent / "invoice_template.json"
+
+VALID_TYPE_CODES  = {"380", "381", "384", "389"}
+ZERO_VAT_CATS     = {"E", "AE", "K", "G", "O", "Z"}
+VALID_VAT_CATS    = {"S", "Z", "E", "AE", "K", "G", "O"}
+
+
+# ── Validation des données ────────────────────────────────────────────
+
+def validate_data(d: dict) -> list:
+    """
+    Vérifie la conformité EN16931/AFNOR des données avant génération.
+    Retourne une liste de chaînes d'erreur. Vide = données valides.
+    """
+    errors = []
+    inv      = d.get("invoice", {})
+    supplier = d.get("supplier", {})
+    buyer    = d.get("buyer", {})
+    lines    = d.get("lines", [])
+    totals   = d.get("totals", {})
+    vat      = d.get("vat_breakdown", [])
+
+    # ── BT-1 : Numéro de facture ─────────────────────────────────────
+    if not str(inv.get("id", "")).strip():
+        errors.append("BT-1 : Le numéro de facture est obligatoire")
+
+    # ── BT-2 : Date d'émission ───────────────────────────────────────
+    issue_date = str(inv.get("issue_date", "")).strip()
+    if not issue_date:
+        errors.append("BT-2 : La date d'émission est obligatoire")
+    elif not re.match(r"^\d{4}-\d{2}-\d{2}$", issue_date):
+        errors.append(f"BT-2 : Format de date invalide '{issue_date}' (attendu AAAA-MM-JJ)")
+
+    # ── BT-3 : Code type de document ─────────────────────────────────
+    type_code = str(inv.get("type_code", "380")).strip()
+    if type_code not in VALID_TYPE_CODES:
+        errors.append(f"BT-3 : Code type invalide '{type_code}' (valeurs : 380, 381, 384, 389)")
+
+    # ── BT-5 : Code monnaie ──────────────────────────────────────────
+    currency = str(inv.get("currency", "")).strip()
+    if not currency:
+        errors.append("BT-5 : Le code monnaie est obligatoire")
+    elif not re.match(r"^[A-Z]{3}$", currency):
+        errors.append(f"BT-5 : Code monnaie invalide '{currency}' (format ISO 4217, ex : EUR)")
+
+    # ── BT-9 : Date d'échéance (format si présente) ──────────────────
+    due_date = str(inv.get("due_date", "")).strip()
+    if due_date and not re.match(r"^\d{4}-\d{2}-\d{2}$", due_date):
+        errors.append(f"BT-9 : Format de date d'échéance invalide '{due_date}' (attendu AAAA-MM-JJ)")
+
+    # ── BT-10 : Référence acheteur ───────────────────────────────────
+    if not str(inv.get("buyer_reference", "")).strip():
+        errors.append("BT-10 : La référence acheteur est obligatoire")
+
+    # ── BG-4 : Fournisseur ───────────────────────────────────────────
+    if not str(supplier.get("name", "")).strip():
+        errors.append("BT-27 : Le nom du fournisseur est obligatoire")
+
+    if not supplier.get("vat_id") and not supplier.get("company_id"):
+        errors.append("BT-31/BT-30 : L'identifiant fournisseur (TVA ou SIREN) est obligatoire")
+
+    sup_vat = str(supplier.get("vat_id", "")).strip()
+    if sup_vat and not re.match(r"^[A-Z]{2}[0-9A-Z]{2,12}$", sup_vat):
+        errors.append(f"BT-31 : Format du numéro TVA fournisseur suspect : '{sup_vat}' (ex : FR07433927332)")
+
+    s_addr = supplier.get("address", {})
+    if not str(s_addr.get("street", "")).strip():
+        errors.append("BT-35 : La rue du fournisseur est obligatoire")
+    if not str(s_addr.get("city", "")).strip():
+        errors.append("BT-37 : La ville du fournisseur est obligatoire")
+    if not str(s_addr.get("postal_zone", "")).strip():
+        errors.append("BT-38 : Le code postal du fournisseur est obligatoire")
+    s_country = str(s_addr.get("country_code", "")).strip()
+    if not s_country:
+        errors.append("BT-40 : Le code pays du fournisseur est obligatoire")
+    elif not re.match(r"^[A-Z]{2}$", s_country):
+        errors.append(f"BT-40 : Code pays invalide '{s_country}' (format ISO 3166-1 alpha-2, ex : FR)")
+
+    # ── BG-7 : Acheteur ──────────────────────────────────────────────
+    if not str(buyer.get("name", "")).strip():
+        errors.append("BT-44 : Le nom de l'acheteur est obligatoire")
+
+    b_addr = buyer.get("address", {})
+    b_country = str(b_addr.get("country_code", "")).strip()
+    if b_country and not re.match(r"^[A-Z]{2}$", b_country):
+        errors.append(f"BT-55 : Code pays acheteur invalide '{b_country}'")
+
+    # ── BG-25 : Lignes ───────────────────────────────────────────────
+    if not lines:
+        errors.append("BG-25 : Au moins une ligne de facture est obligatoire")
+
+    for i, line in enumerate(lines, 1):
+        lbl = f"Ligne {i}"
+        if not str(line.get("name", "")).strip():
+            errors.append(f"BT-153 ({lbl}) : Le nom de l'article est obligatoire")
+        if line.get("quantity") is None:
+            errors.append(f"BT-129 ({lbl}) : La quantité est obligatoire")
+        if line.get("unit_price") is None:
+            errors.append(f"BT-146 ({lbl}) : Le prix unitaire est obligatoire")
+        if line.get("net_amount") is None:
+            errors.append(f"BT-131 ({lbl}) : Le montant net est obligatoire")
+        cat = str(line.get("vat_category", "S")).strip()
+        if cat not in VALID_VAT_CATS:
+            errors.append(f"BT-151 ({lbl}) : Catégorie TVA invalide '{cat}' (valeurs : {', '.join(sorted(VALID_VAT_CATS))})")
+        rate = float(line.get("vat_rate", 0))
+        if cat in ZERO_VAT_CATS and rate != 0:
+            errors.append(f"BT-152 ({lbl}) : Taux TVA doit être 0% pour la catégorie {cat}")
+
+        # BR-CO-03 : net = qty × prix - remise
+        try:
+            qty      = Decimal(str(line["quantity"]))
+            uprice   = Decimal(str(line["unit_price"]))
+            discount = Decimal(str(line.get("discount", 0)))
+            net      = Decimal(str(line["net_amount"]))
+            expected = (qty * uprice - discount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if abs(net - expected) > Decimal("0.02"):
+                errors.append(
+                    f"BR-CO-03 ({lbl}) : Montant net ({net}) ≠ Qté×Prix−Remise ({expected})"
+                )
+        except Exception:
+            pass
+
+    # ── BG-22 : Cohérence des totaux ─────────────────────────────────
+    try:
+        line_ext   = Decimal(str(totals.get("line_extension", 0)))
+        allow      = Decimal(str(totals.get("allowance_total", 0)))
+        charges    = Decimal(str(totals.get("charge_total", 0)))
+        tax_excl   = Decimal(str(totals.get("tax_exclusive", 0)))
+        tax_incl   = Decimal(str(totals.get("tax_inclusive", 0)))
+        tax_amt    = Decimal(str(totals.get("tax_amount", 0)))
+        prepaid    = Decimal(str(totals.get("prepaid", 0)))
+        payable    = Decimal(str(totals.get("payable", 0)))
+
+        # BR-CO-11 : BT-109 = BT-106 − BT-107 + BT-108
+        expected_excl = line_ext - allow + charges
+        if abs(tax_excl - expected_excl) > Decimal("0.02"):
+            errors.append(
+                f"BR-CO-11 : Montant HT ({tax_excl}) ≠ LignesHT − Remises + Frais ({expected_excl})"
+            )
+        # BR-CO-13 : BT-112 = BT-109 + BT-110
+        expected_incl = tax_excl + tax_amt
+        if abs(tax_incl - expected_incl) > Decimal("0.02"):
+            errors.append(
+                f"BR-CO-13 : Montant TTC ({tax_incl}) ≠ HT + TVA ({expected_incl})"
+            )
+        # BR-CO-16 : BT-115 = BT-112 − BT-113
+        expected_payable = tax_incl - prepaid
+        if abs(payable - expected_payable) > Decimal("0.02"):
+            errors.append(
+                f"BR-CO-16 : Montant à payer ({payable}) ≠ TTC − Acompte ({expected_payable})"
+            )
+    except Exception:
+        pass
+
+    return errors
 
 
 # ── Chargement des données ────────────────────────────────────────────
@@ -80,6 +236,8 @@ def build_ubl(d: dict) -> str:
     _t(root, cbc("CustomizationID"), "urn:cen.eu:en16931:2017")           # BT-24
     _t(root, cbc("ID"),              inv["id"])                            # BT-1
     _t(root, cbc("IssueDate"),       inv["issue_date"])                    # BT-2
+    if inv.get("due_date"):
+        _t(root, cbc("DueDate"), inv["due_date"])                          # BT-9
     _t(root, cbc(type_el),           type_code)                            # BT-3
     if inv.get("note"):
         _t(root, cbc("Note"), inv["note"])                                 # BT-22
@@ -151,8 +309,7 @@ def build_ubl(d: dict) -> str:
                 _t(pfa, cbc("Name"), payment["account_name"])
             if payment.get("bic"):
                 fib = ET.SubElement(pfa, cac("FinancialInstitutionBranch"))
-                fi  = ET.SubElement(fib, cac("FinancialInstitution"))
-                _t(fi, cbc("ID"), payment["bic"])
+                _t(fib, cbc("ID"), payment["bic"])  # BT-86 — BIC directement dans BranchID (UBL 2.1)
 
     if inv.get("payment_terms_note"):
         pt = ET.SubElement(root, cac("PaymentTerms"))
@@ -409,13 +566,16 @@ def build_cii(d: dict) -> str:
             dds.text = inv["due_date"].replace("-", "")
             dds.set("format", "102")
     sms = ET.SubElement(hts, ram("SpecifiedTradeSettlementHeaderMonetarySummation"))
-    _t(sms, ram("LineTotalAmount"),     f"{float(totals['line_extension']):.2f}")  # BT-106
+    _t(sms, ram("LineTotalAmount"),     f"{float(totals['line_extension']):.2f}")   # BT-106
     if totals.get("charge_total", 0):
         _t(sms, ram("ChargeTotalAmount"),    f"{float(totals['charge_total']):.2f}")   # BT-108
     if totals.get("allowance_total", 0):
         _t(sms, ram("AllowanceTotalAmount"), f"{float(totals['allowance_total']):.2f}") # BT-107
     _t(sms, ram("TaxBasisTotalAmount"), f"{float(totals['tax_exclusive']):.2f}")   # BT-109
-    _t(sms, ram("TaxTotalAmount"),      f"{float(totals['tax_amount']):.2f}")      # BT-110
+    # BT-110 — TaxTotalAmount doit porter currencyID (requis EN16931/Factur-X)
+    tta = ET.SubElement(sms, ram("TaxTotalAmount"))
+    tta.text = f"{float(totals['tax_amount']):.2f}"
+    tta.set("currencyID", cur)
     _t(sms, ram("GrandTotalAmount"),    f"{float(totals['tax_inclusive']):.2f}")   # BT-112
     if totals.get("prepaid", 0):
         _t(sms, ram("TotalPrepaidAmount"), f"{float(totals['prepaid']):.2f}")      # BT-113
@@ -491,7 +651,13 @@ Exemples :
         print(f"Erreur : fichier introuvable : {args.config}", file=sys.stderr)
         sys.exit(1)
 
-    data    = load_data(args.config)
+    data   = load_data(args.config)
+    errors = validate_data(data)
+    if errors:
+        print("Erreurs de validation :", file=sys.stderr)
+        for e in errors:
+            print(f"  • {e}", file=sys.stderr)
+        sys.exit(1)
     xml_str = build_ubl(data) if args.format == "ubl" else build_cii(data)
 
     inv_id = data["invoice"]["id"].replace(" ", "_").replace("/", "-")
