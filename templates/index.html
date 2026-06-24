@@ -165,6 +165,24 @@
       font-size: 1rem; font-weight: 500; color: #15803d;
     }
     .spinner-border-sm { width: 1rem; height: 1rem; }
+
+    /* ── Country picker ── */
+    .country-select {
+      background: rgba(255,255,255,.13); color: #fff;
+      border: 1px solid rgba(255,255,255,.28); border-radius: .4rem;
+      padding: .3rem .65rem; font-size: .82rem; cursor: pointer; min-width: 220px;
+    }
+    .country-select:focus { outline: none; border-color: var(--bp-red); }
+    .country-select option { background: #1A1A1A; color: #fff; }
+    .country-select option:disabled { color: rgba(255,255,255,.35); }
+
+    /* ── Validation inline ── */
+    .form-control.is-invalid, .form-select.is-invalid {
+      border-color: #dc3545 !important;
+      background-image: none;
+    }
+    #alertMsg .alert ul { font-size: .85rem; }
+    .missing-badge { font-size: .62em; vertical-align: middle; margin-left: .3em; }
   </style>
 </head>
 <body>
@@ -176,14 +194,37 @@
     <div class="page-header-red">
       <img src="/static/BearingPoint_Symbol_Black_RGB.png" class="bp-symbol-img" alt="BearingPoint">
     </div>
-    <!-- Zone sombre : titre fixe -->
+    <!-- Zone sombre : titre + sélecteur pays -->
     <div class="page-header-dark">
-      <h5 class="mb-0 fw-bold" style="color:#fff;font-size:1.05rem;">
-        Générateur de Factures Électroniques - by BearingPoint
-      </h5>
-      <small style="color:rgba(255,255,255,.6);font-size:.78rem;">
-        UBL 2.1 / CII D22B (Factur-X 1.09) — Norme EN16931 / AFNOR XP Z12-014
-      </small>
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:1rem;flex-wrap:wrap">
+        <div>
+          <h5 class="mb-0 fw-bold" style="color:#fff;font-size:1.05rem;">
+            Générateur de Factures Électroniques - by BearingPoint
+          </h5>
+          <small style="color:rgba(255,255,255,.6);font-size:.78rem;">
+            UBL 2.1 / CII D22B (Factur-X 1.09) — Norme EN16931 / AFNOR XP Z12-014
+          </small>
+        </div>
+        <div style="flex-shrink:0">
+          <label style="color:rgba(255,255,255,.55);font-size:.7rem;display:block;margin-bottom:.2rem;letter-spacing:.04em;text-transform:uppercase">
+            🌍 Contexte pays
+          </label>
+          <select id="countryCtx" class="country-select" onchange="onCountryChange()">
+            <option value="FR" selected>🇫🇷 France — AFNOR XP Z12-014</option>
+            <option value="DE" disabled>🇩🇪 Allemagne — XRechnung (bientôt)</option>
+            <option value="IT" disabled>🇮🇹 Italie — SDI FatturaPA (bientôt)</option>
+            <option value="BE" disabled>🇧🇪 Belgique (bientôt)</option>
+            <option value="ES" disabled>🇪🇸 Espagne (bientôt)</option>
+            <option value="NL" disabled>🇳🇱 Pays-Bas (bientôt)</option>
+            <option value="LU" disabled>🇱🇺 Luxembourg (bientôt)</option>
+            <option value="AT" disabled>🇦🇹 Autriche (bientôt)</option>
+            <option value="PL" disabled>🇵🇱 Pologne (bientôt)</option>
+            <option value="SE" disabled>🇸🇪 Suède (bientôt)</option>
+            <option value="DK" disabled>🇩🇰 Danemark (bientôt)</option>
+            <option value="PT" disabled>🇵🇹 Portugal (bientôt)</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -237,10 +278,24 @@
             <div class="col-md-2">
               <label class="form-label">Type <span class="badge bg-danger badge-req">BT-3</span></label>
               <select id="inv_type_code" class="form-select" onchange="onTypeChange()">
-                <option value="380">380 — Facture</option>
-                <option value="381">381 — Avoir</option>
-                <option value="384">384 — Facture corrective</option>
-                <option value="389">389 — Note de débit</option>
+                <optgroup label="Factures">
+                  <option value="380">380 — Facture commerciale</option>
+                  <option value="326">326 — Facture partielle</option>
+                  <option value="386">386 — Facture d'acompte</option>
+                  <option value="385">385 — Facture récapitulative</option>
+                  <option value="388">388 — Facture fiscale</option>
+                  <option value="389">389 — Autofacturation (self-billing)</option>
+                </optgroup>
+                <optgroup label="Avoirs">
+                  <option value="381">381 — Avoir</option>
+                  <option value="261">261 — Avoir autofacturé</option>
+                  <option value="296">296 — Avoir d'écart de prix</option>
+                </optgroup>
+                <optgroup label="Autres">
+                  <option value="383">383 — Note de débit</option>
+                  <option value="384">384 — Facture corrective</option>
+                  <option value="382">382 — Note de commission</option>
+                </optgroup>
               </select>
             </div>
             <div class="col-md-1">
@@ -693,23 +748,90 @@ window.addEventListener('load', () => {
 function today() { return new Date().toISOString().slice(0, 10); }
 
 // ── Type de document ─────────────────────────────────────────────────
+const _typePrefix = {
+  '380':'FACT','326':'FACT','386':'ACOMP','385':'FACT','388':'FACT',
+  '381':'AVOIR','261':'AVOIR','296':'AVOIR',
+  '383':'NOTE','384':'CORR','382':'COMM','389':'SELF',
+};
+const _avoirCodes = new Set(['381','261','296']);
+
 function onTypeChange() {
-  const code = document.getElementById('inv_type_code').value;
-  const labels = {
-    '380': ['🧾 Générateur de Factures Électroniques', false],
-    '381': ["↩️ Générateur d'Avoirs Électroniques",   true],
-    '384': ['✏️ Générateur de Factures Correctives',  false],
-    '389': ['📋 Générateur de Notes de Débit',        false],
-  };
-  const [text, isAvoir] = labels[code] || labels['380'];
-  // Titre fixe — on ne le change pas
-  document.getElementById('pageHeader').className  = 'page-header mb-0' + (isAvoir ? ' avoir' : '');
+  const code    = document.getElementById('inv_type_code').value;
+  const isAvoir = _avoirCodes.has(code);
+  document.getElementById('pageHeader').className = 'page-header mb-0' + (isAvoir ? ' avoir' : '');
   const idField = document.getElementById('inv_id');
-  const prefix  = { '380': 'FACT', '381': 'AVOIR', '384': 'FACT', '389': 'NOTE' };
+  const prefix  = _typePrefix[code] || 'FACT';
   const d = new Date();
   const yy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0');
-  if (/^(FACT|AVOIR|NOTE)-\d{6}-\d+$/.test(idField.value))
-    idField.value = `${prefix[code]||'FACT'}-${yy}${mm}-001`;
+  if (/^(FACT|AVOIR|NOTE|CORR|COMM|SELF|ACOMP)-\d{6}-\d+$/.test(idField.value))
+    idField.value = `${prefix}-${yy}${mm}-001`;
+}
+
+// ── Sélecteur de pays ─────────────────────────────────────────────────
+function onCountryChange() {
+  // Placeholder — support multi-pays à venir
+  // Pour l'instant France uniquement ; les autres options sont disabled
+}
+
+// ── Validation des champs obligatoires ───────────────────────────────
+const _requiredDefs = [
+  { id:'inv_id',              label:'N° document',                 bt:'BT-1',  section:'En-tête' },
+  { id:'inv_issue_date',      label:'Date d\'émission',            bt:'BT-2',  section:'En-tête' },
+  { id:'inv_buyer_reference', label:'Référence acheteur',          bt:'BT-10', section:'En-tête' },
+  { id:'inv_currency',        label:'Code monnaie',                bt:'BT-5',  section:'En-tête' },
+  { id:'sup_name',            label:'Raison sociale fournisseur',  bt:'BT-27', section:'Fournisseur' },
+  { id:'sup_vat_id',          label:'N° TVA fournisseur',          bt:'BT-31', section:'Fournisseur' },
+  { id:'sup_street',          label:'Adresse fournisseur',         bt:'BT-35', section:'Fournisseur' },
+  { id:'sup_postal_zone',     label:'Code postal fournisseur',     bt:'BT-38', section:'Fournisseur' },
+  { id:'sup_city',            label:'Ville fournisseur',           bt:'BT-37', section:'Fournisseur' },
+  { id:'sup_country_code',    label:'Pays fournisseur (ISO 2)',    bt:'BT-40', section:'Fournisseur' },
+];
+
+function validateRequired() {
+  // Réinitialiser l'état visuel
+  _requiredDefs.forEach(def => {
+    const el = document.getElementById(def.id);
+    if (el) el.classList.remove('is-invalid');
+  });
+
+  const profile = document.getElementById('facturx_profile').value;
+  const noLines = ['MINIMUM','BASICWL'].includes(profile);
+  const missing = [];
+
+  for (const def of _requiredDefs) {
+    const el = document.getElementById(def.id);
+    if (!el) continue;
+    if (!el.value.trim()) {
+      el.classList.add('is-invalid');
+      missing.push(def);
+    }
+  }
+
+  if (!noLines && document.querySelectorAll('#lineItems tr').length === 0)
+    missing.push({ id:null, label:'Au moins une ligne de facture', bt:'BG-25', section:'Lignes' });
+
+  return missing;
+}
+
+function showValidationErrors(missing) {
+  const alert = document.getElementById('alertMsg');
+  const bySection = {};
+  for (const f of missing) {
+    if (!bySection[f.section]) bySection[f.section] = [];
+    bySection[f.section].push(
+      `${f.label} <span class="badge bg-danger missing-badge">${f.bt}</span>`
+    );
+  }
+  const rows = Object.entries(bySection).map(([sec, fields]) =>
+    `<li><span class="fw-semibold">${sec} :</span> ${fields.join(' · ')}</li>`
+  ).join('');
+  alert.innerHTML = `<div class="alert alert-danger mb-0">
+    <strong>⚠️ Champs obligatoires manquants — veuillez les compléter avant de générer :</strong>
+    <ul class="mb-0 mt-2 ps-3">${rows}</ul>
+  </div>`;
+  alert.style.display = '';
+  const firstInvalid = document.querySelector('.is-invalid');
+  if (firstInvalid) firstInvalid.scrollIntoView({ behavior:'smooth', block:'center' });
 }
 
 // ── Sections collapsibles ─────────────────────────────────────────────
@@ -968,12 +1090,8 @@ function collectData() {
 // ── Soumission formulaire ─────────────────────────────────────────────
 document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const form = e.target;
-  if (!form.checkValidity()) {
-    form.classList.add('was-validated');
-    form.querySelector(':invalid')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
+  const missing = validateRequired();
+  if (missing.length) { showValidationErrors(missing); return; }
   const btn   = document.getElementById('generateBtn');
   const alert = document.getElementById('alertMsg');
   alert.style.display = 'none';
@@ -1023,12 +1141,8 @@ function escHtml(s) {
 
 // ── Génération PDF Factur-X ───────────────────────────────────────────
 async function generatePdf() {
-  const form  = document.getElementById('invoiceForm');
-  if (!form.checkValidity()) {
-    form.classList.add('was-validated');
-    form.querySelector(':invalid')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
+  const missing = validateRequired();
+  if (missing.length) { showValidationErrors(missing); return; }
   const btn   = document.getElementById('pdfBtn');
   const alert = document.getElementById('alertMsg');
   alert.style.display = 'none';
