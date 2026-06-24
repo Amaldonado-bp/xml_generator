@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Générateur de factures EN16931 — UBL 2.1 / CII D16B
-Supporte : factures (380), avoirs (381), factures correctives (384), notes de débit (389)
+Générateur de factures EN16931/Factur-X 1.09 — UBL 2.1 / CII D22B
+Profils Factur-X : MINIMUM, BASIC WL, BASIC, EN16931, EXTENDED
+Supporte aussi : PEPPOL BIS Billing 3.0 (UBL)
 """
 
 import json
@@ -27,16 +28,35 @@ _CII_UDT = "urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"
 
 TEMPLATE_PATH = Path(__file__).parent / "invoice_template.json"
 
-VALID_TYPE_CODES  = {"380", "381", "384", "389"}
+# Codes type UN/EDIFACT D.22B acceptés par Factur-X 1.09 / EN16931
+VALID_TYPE_CODES = {
+    "80", "82", "84", "130", "202", "203", "204", "211",
+    "261", "262", "295", "296", "308", "325", "326", "380",
+    "381", "382", "383", "384", "385", "386", "387", "388",
+    "389", "390", "393", "394", "395", "396", "420", "456",
+    "457", "458", "527", "575", "623", "633", "751", "780",
+    "817", "870", "875", "876", "877", "935",
+}
 ZERO_VAT_CATS     = {"E", "AE", "K", "G", "O", "Z"}
 VALID_VAT_CATS    = {"S", "Z", "E", "AE", "K", "G", "O"}
+
+# Profils Factur-X 1.09 et leurs URNs de spécification (AFNOR XP Z12-014)
+FACTURX_PROFILES = {
+    "MINIMUM":  "urn:factur-x.eu:1p0:minimum",
+    "BASICWL":  "urn:factur-x.eu:1p0:basicwl",
+    "BASIC":    "urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic",
+    "EN16931":  "urn:cen.eu:en16931:2017",
+    "EXTENDED": "urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended",
+}
+PEPPOL_BIS_ID      = "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0"
+_PROFILES_NO_LINES = {"MINIMUM", "BASICWL"}  # Ces profils n'ont pas de lignes de facture
 
 
 # ── Validation des données ────────────────────────────────────────────
 
-def validate_data(d: dict) -> list:
+def validate_data(d: dict, profile: str = "EN16931") -> list:
     """
-    Vérifie la conformité EN16931/AFNOR des données avant génération.
+    Vérifie la conformité EN16931/Factur-X des données avant génération.
     Retourne une liste de chaînes d'erreur. Vide = données valides.
     """
     errors = []
@@ -61,7 +81,9 @@ def validate_data(d: dict) -> list:
     # ── BT-3 : Code type de document ─────────────────────────────────
     type_code = str(inv.get("type_code", "380")).strip()
     if type_code not in VALID_TYPE_CODES:
-        errors.append(f"BT-3 : Code type invalide '{type_code}' (valeurs : 380, 381, 384, 389)")
+        errors.append(f"BT-3 : Code type invalide '{type_code}' "
+                      f"(codes acceptés Factur-X 1.09 : 380=facture, 381=avoir, 384=corrective, "
+                      f"389=autofacturation, 326=partielle, 386=acompte, ...)")
 
     # ── BT-5 : Code monnaie ──────────────────────────────────────────
     currency = str(inv.get("currency", "")).strip()
@@ -113,7 +135,7 @@ def validate_data(d: dict) -> list:
         errors.append(f"BT-55 : Code pays acheteur invalide '{b_country}'")
 
     # ── BG-25 : Lignes ───────────────────────────────────────────────
-    if not lines:
+    if not lines and profile.upper() not in _PROFILES_NO_LINES:
         errors.append("BG-25 : Au moins une ligne de facture est obligatoire")
 
     for i, line in enumerate(lines, 1):
@@ -204,7 +226,7 @@ def _merge(base: dict, override: dict) -> dict:
 
 # ── Générateur UBL 2.1 ────────────────────────────────────────────────
 
-def build_ubl(d: dict) -> str:
+def build_ubl(d: dict, profile: str = "EN16931", peppol: bool = False) -> str:
     type_code = str(d["invoice"].get("type_code", "380"))
     is_credit = type_code == "381"
     doc_ns    = _UBL_CREDIT if is_credit else _UBL_INV
@@ -233,7 +255,8 @@ def build_ubl(d: dict) -> str:
     root = ET.Element(f"{{{doc_ns}}}{root_tag}")
 
     # ── En-tête ──────────────────────────────────────────────────────
-    _t(root, cbc("CustomizationID"), "urn:cen.eu:en16931:2017")           # BT-24
+    cid_ubl = PEPPOL_BIS_ID if peppol else FACTURX_PROFILES.get(profile.upper(), FACTURX_PROFILES["EN16931"])
+    _t(root, cbc("CustomizationID"), cid_ubl)                             # BT-24
     _t(root, cbc("ID"),              inv["id"])                            # BT-1
     _t(root, cbc("IssueDate"),       inv["issue_date"])                    # BT-2
     if inv.get("due_date"):
@@ -412,9 +435,9 @@ def _ubl_contact(parent, contact, cac, cbc):
     if contact.get("email"): _t(c, cbc("ElectronicMail"), contact["email"])
 
 
-# ── Générateur CII D16B ───────────────────────────────────────────────
+# ── Générateur CII D22B (Factur-X 1.09) ──────────────────────────────
 
-def build_cii(d: dict) -> str:
+def build_cii(d: dict, profile: str = "EN16931") -> str:
     ET.register_namespace("rsm", _CII_RSM)
     ET.register_namespace("ram", _CII_RAM)
     ET.register_namespace("udt", _CII_UDT)
@@ -438,7 +461,7 @@ def build_cii(d: dict) -> str:
     # ExchangedDocumentContext
     ctx  = ET.SubElement(root, rsm("ExchangedDocumentContext"))
     gbpi = ET.SubElement(ctx, ram("GuidelineSpecifiedDocumentContextParameter"))
-    _t(gbpi, ram("ID"), "urn:cen.eu:en16931:2017")
+    _t(gbpi, ram("ID"), FACTURX_PROFILES.get(profile.upper(), FACTURX_PROFILES["EN16931"]))
 
     # ExchangedDocument
     doc = ET.SubElement(root, rsm("ExchangedDocument"))
@@ -455,8 +478,8 @@ def build_cii(d: dict) -> str:
     # SupplyChainTradeTransaction
     sctt = ET.SubElement(root, rsm("SupplyChainTradeTransaction"))
 
-    # Lignes
-    for line in lines:
+    # Lignes — absentes pour les profils MINIMUM et BASIC WL
+    for line in ([] if profile.upper() in _PROFILES_NO_LINES else lines):
         li  = ET.SubElement(sctt, ram("IncludedSupplyChainTradeLineItem"))
         lad = ET.SubElement(li, ram("AssociatedDocumentLineDocument"))
         _t(lad, ram("LineID"), str(line["id"]))
@@ -632,18 +655,26 @@ def _pretty_xml(root: ET.Element) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Générateur de factures EN16931 (UBL 2.1 / CII D16B)",
+        description="Générateur de factures Factur-X 1.09 / EN16931 (UBL 2.1 / CII D22B)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemples :
   python invoice_generator.py invoice_example.json
-  python invoice_generator.py invoice_example.json --format cii
+  python invoice_generator.py invoice_example.json --format cii --profile EN16931
+  python invoice_generator.py invoice_example.json --format cii --profile MINIMUM
+  python invoice_generator.py invoice_example.json --format ubl --peppol
   python invoice_generator.py invoice_example.json --format ubl -o ma_facture.xml
         """
     )
     parser.add_argument("config", help="Fichier JSON avec les champs variables")
     parser.add_argument("--format", choices=["ubl", "cii"], default="ubl",
                         help="Format de sortie : ubl (défaut) ou cii")
+    parser.add_argument("--profile",
+                        choices=["MINIMUM", "BASICWL", "BASIC", "EN16931", "EXTENDED"],
+                        default="EN16931",
+                        help="Profil Factur-X 1.09 (défaut : EN16931)")
+    parser.add_argument("--peppol", action="store_true",
+                        help="Utiliser PEPPOL BIS Billing 3.0 comme CustomizationID (UBL uniquement)")
     parser.add_argument("-o", "--output", help="Chemin du fichier XML de sortie")
     args = parser.parse_args()
 
@@ -652,13 +683,17 @@ Exemples :
         sys.exit(1)
 
     data   = load_data(args.config)
-    errors = validate_data(data)
+    errors = validate_data(data, profile=args.profile)
     if errors:
         print("Erreurs de validation :", file=sys.stderr)
         for e in errors:
             print(f"  • {e}", file=sys.stderr)
         sys.exit(1)
-    xml_str = build_ubl(data) if args.format == "ubl" else build_cii(data)
+
+    if args.format == "ubl":
+        xml_str = build_ubl(data, profile=args.profile, peppol=args.peppol)
+    else:
+        xml_str = build_cii(data, profile=args.profile)
 
     inv_id = data["invoice"]["id"].replace(" ", "_").replace("/", "-")
     output = args.output or f"{inv_id}_{args.format}.xml"
@@ -666,7 +701,7 @@ Exemples :
     with open(output, "w", encoding="utf-8") as f:
         f.write(xml_str)
 
-    print(f"Facture generee : {output}  ({args.format.upper()})")
+    print(f"Facture generee : {output}  ({args.format.upper()} / {args.profile})")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Validateur de factures électroniques — UBL 2.1 / CII D16B
-Vérifie la conformité à la norme EN16931 / AFNOR XP Z12-014
+Validateur de factures électroniques — UBL 2.1 / CII D22B
+Vérifie la conformité à la norme EN16931 / AFNOR XP Z12-014 / Factur-X 1.09
 
 Usage :
   python invoice_validator.py facture.xml
@@ -41,9 +41,28 @@ NS_CII_RSM    = "urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
 NS_CII_RAM    = "urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
 NS_CII_UDT    = "urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"
 
-VALID_TYPE_CODES  = {"380", "381", "384", "389"}
+# Codes type UN/EDIFACT D.22B acceptés par Factur-X 1.09 / EN16931
+VALID_TYPE_CODES = {
+    "80", "82", "84", "130", "202", "203", "204", "211",
+    "261", "262", "295", "296", "308", "325", "326", "380",
+    "381", "382", "383", "384", "385", "386", "387", "388",
+    "389", "390", "393", "394", "395", "396", "420", "456",
+    "457", "458", "527", "575", "623", "633", "751", "780",
+    "817", "870", "875", "876", "877", "935",
+}
 ZERO_VAT_CATS     = {"E", "AE", "K", "G", "O", "Z"}
 VALID_VAT_CATS    = {"S", "Z", "E", "AE", "K", "G", "O"}
+
+# Correspondance URN de spécification → nom de profil Factur-X 1.09
+FACTURX_PROFILES = {
+    "urn:factur-x.eu:1p0:minimum":   "MINIMUM",
+    "urn:factur-x.eu:1p0:basicwl":   "BASICWL",
+    "urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic": "BASIC",
+    "urn:cen.eu:en16931:2017":        "EN16931",
+    "urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended": "EXTENDED",
+    "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0": "PEPPOL",
+}
+_PROFILES_NO_LINES = {"MINIMUM", "BASICWL"}  # Ces profils n'ont pas de lignes de facture
 
 # 1824 codes actifs UN/ECE Rec 20 (source : https://service.unece.org/trade/uncefact/vocabulary/rec20/)
 VALID_UNIT_CODES = {
@@ -276,6 +295,7 @@ class InvoiceValidator:
         self.issues: list = []
         self.fmt: Optional[str] = None  # 'UBL' | 'CII'
         self.type_code: Optional[str] = None
+        self.profile: Optional[str] = None  # Profil Factur-X détecté (MINIMUM, BASICWL, ...)
         self.root: Optional[ET.Element] = None
         self._cac = f"{{{NS_UBL_CAC}}}"
         self._cbc = f"{{{NS_UBL_CBC}}}"
@@ -339,7 +359,7 @@ class InvoiceValidator:
         schema_name = (
             "UBL-Invoice-2.1.xsd"
             if self.fmt == "UBL"
-            else "CrossIndustryInvoice_100pD16B.xsd"
+            else "CrossIndustryInvoice_100pD22B.xsd"
         )
         schema_path = self.schema_dir / schema_name
         if not schema_path.exists():
@@ -366,8 +386,12 @@ class InvoiceValidator:
         cid = _txt(r, f"{cbc}CustomizationID")
         if not cid:
             self._err("BR-01", "BT-24 : L'identifiant de spécification (CustomizationID) est obligatoire")
-        elif "en16931" not in cid:
-            self._warn("BR-01", f"BT-24 : CustomizationID '{cid}' ne référence pas en16931")
+        else:
+            self.profile = FACTURX_PROFILES.get(cid)
+            if self.profile is None:
+                self._warn("BR-01",
+                    f"BT-24 : CustomizationID '{cid}' non reconnu parmi les profils "
+                    f"Factur-X 1.09 / PEPPOL (profils connus : {', '.join(FACTURX_PROFILES.values())})")
 
         # BR-02 — ID facture (BT-1)
         if not _txt(r, f"{cbc}ID"):
@@ -450,7 +474,8 @@ class InvoiceValidator:
         if not lines:
             lines = r.findall(f"{cac}CreditNoteLine")
         if not lines:
-            self._err("BR-16", "BG-25 : Au moins une ligne de facture est obligatoire")
+            if self.profile not in _PROFILES_NO_LINES:
+                self._err("BR-16", "BG-25 : Au moins une ligne de facture est obligatoire")
         else:
             for i, line in enumerate(lines, 1):
                 self._validate_ubl_line(line, i, currency)
@@ -535,6 +560,26 @@ class InvoiceValidator:
         if label == "fournisseur" and (ple is None or not (ple.text or "").strip()):
             self._warn("BT-30", "BT-30 : L'identifiant légal du fournisseur (SIREN) est recommandé")
 
+        # BR-CO-26 : Le fournisseur doit avoir au moins un identifiant
+        if label == "fournisseur":
+            has_id = False
+            if party.find(f"{cac}PartyIdentification/{cbc}ID") is not None:
+                has_id = True
+            if not has_id and ple is not None and (ple.text or "").strip():
+                has_id = True
+            if not has_id:
+                vat_co = party.find(f"{cac}PartyTaxScheme/{cbc}CompanyID")
+                if vat_co is not None and (vat_co.text or "").strip():
+                    has_id = True
+            if not has_id:
+                ep = party.find(f"{cbc}EndpointID")
+                if ep is not None and (ep.text or "").strip():
+                    has_id = True
+            if not has_id:
+                self._err("BR-CO-26",
+                    "BG-4 : Le fournisseur doit avoir au moins un identifiant "
+                    "(numéro TVA, identifiant légal, EndpointID ou identifiant global)")
+
     def _validate_ubl_tax_total(self, root, tt, currency):
         cac, cbc = self._cac, self._cbc
 
@@ -578,6 +623,24 @@ class InvoiceValidator:
                 self._err(f"BR-{cat}-08",
                     f"BG-23 / TaxSubtotal {i} : Taux TVA doit être 0% pour catégorie {cat} (reçu {rate}%)")
 
+            # BR-E-10 : Catégorie E exige un motif d'exonération
+            if cat == "E":
+                exemp_code = _txt(tc, f"{cbc}TaxExemptionReasonCode") if tc is not None else ""
+                exemp_text = _txt(tc, f"{cbc}TaxExemptionReason")     if tc is not None else ""
+                if not exemp_code and not exemp_text:
+                    self._err("BR-E-10",
+                        f"BG-23 / TaxSubtotal {i} : Catégorie E (exonéré de TVA) exige "
+                        f"TaxExemptionReasonCode ou TaxExemptionReason")
+
+            # BR-G-10 : Catégorie G exige un motif d'exonération
+            if cat == "G":
+                exemp_code = _txt(tc, f"{cbc}TaxExemptionReasonCode") if tc is not None else ""
+                exemp_text = _txt(tc, f"{cbc}TaxExemptionReason")     if tc is not None else ""
+                if not exemp_code and not exemp_text:
+                    self._err("BR-G-10",
+                        f"BG-23 / TaxSubtotal {i} : Catégorie G (export) exige "
+                        f"TaxExemptionReasonCode ou TaxExemptionReason")
+
             # Vérification du calcul TVA
             if rate > Decimal("0"):
                 expected = (taxable * rate / Decimal("100")).quantize(
@@ -592,6 +655,17 @@ class InvoiceValidator:
         if abs(total_tax - calc_total) > Decimal("0.02"):
             self._warn("BR-CO-12",
                 f"BG-23 : TaxAmount total ({total_tax}) ≠ somme des sous-totaux TVA ({calc_total})")
+
+        # BR-O-11 : La catégorie O ne peut pas coexister avec d'autres catégories TVA
+        all_cats_in_subtotals = []
+        for s in subtotals:
+            tc_s = s.find(f"{cac}TaxCategory")
+            if tc_s is not None:
+                all_cats_in_subtotals.append(_txt(tc_s, f"{cbc}ID"))
+        if "O" in all_cats_in_subtotals and len(set(all_cats_in_subtotals)) > 1:
+            self._err("BR-O-11",
+                "BG-23 : La catégorie O (hors champ TVA) ne peut pas coexister "
+                "avec d'autres catégories TVA dans la même facture")
 
     def _validate_ubl_totals(self, root, lmt, currency):
         cac, cbc = self._cac, self._cbc
@@ -761,8 +835,12 @@ class InvoiceValidator:
             f"{ram}GuidelineSpecifiedDocumentContextParameter/{ram}ID")
         if not cid:
             self._err("BR-01", "BT-24 : L'identifiant de spécification est obligatoire")
-        elif "en16931" not in cid:
-            self._warn("BR-01", f"BT-24 : GuidelineID '{cid}' ne référence pas en16931")
+        else:
+            self.profile = FACTURX_PROFILES.get(cid)
+            if self.profile is None:
+                self._warn("BR-01",
+                    f"BT-24 : GuidelineID '{cid}' non reconnu parmi les profils "
+                    f"Factur-X 1.09 / PEPPOL (profils connus : {', '.join(FACTURX_PROFILES.values())})")
 
         doc = r.find(f"{rsm}ExchangedDocument")
         if doc is None:
@@ -816,10 +894,11 @@ class InvoiceValidator:
         else:
             self._validate_cii_settlement(sctt, hts)
 
-        # BG-25 — Lignes
+        # BG-25 — Lignes (absentes pour MINIMUM et BASIC WL)
         lines = sctt.findall(f"{ram}IncludedSupplyChainTradeLineItem")
         if not lines:
-            self._err("BR-16", "BG-25 : Au moins une ligne est obligatoire")
+            if self.profile not in _PROFILES_NO_LINES:
+                self._err("BR-16", "BG-25 : Au moins une ligne est obligatoire")
         else:
             cur = _txt(hts, f"{ram}InvoiceCurrencyCode") if hts is not None else "EUR"
             for i, line in enumerate(lines, 1):
@@ -933,6 +1012,23 @@ class InvoiceValidator:
         if label == "fournisseur" and (lo is None or not (lo.text or "").strip()):
             self._warn("BT-30", "BT-30 : L'identifiant légal du fournisseur (SIREN) est recommandé")
 
+        # BR-CO-26 : Le fournisseur doit avoir au moins un identifiant
+        if label == "fournisseur":
+            has_id = False
+            pid = party.find(f"{ram}ID")
+            if pid is not None and (pid.text or "").strip():
+                has_id = True
+            if not has_id and lo is not None and (lo.text or "").strip():
+                has_id = True
+            if not has_id:
+                vat_id = party.find(f"{ram}SpecifiedTaxRegistration/{ram}ID")
+                if vat_id is not None and (vat_id.text or "").strip() and vat_id.get("schemeID") == "VA":
+                    has_id = True
+            if not has_id:
+                self._err("BR-CO-26",
+                    "BG-4 : Le fournisseur doit avoir au moins un identifiant "
+                    "(SpecifiedTaxRegistration[VA], SpecifiedLegalOrganization/ID ou ID global)")
+
     def _validate_cii_settlement(self, sctt, hts):
         ram = self._ram
         udt = self._udt
@@ -972,6 +1068,24 @@ class InvoiceValidator:
                     self._err(f"BR-{cat}-08",
                         f"BG-23 / TVA {i} : Taux 0% obligatoire pour catégorie {cat} (reçu {rate}%)")
 
+                # BR-E-10 : Catégorie E exige un motif d'exonération
+                if cat == "E":
+                    exemp_code = _txt(tax, f"{ram}ExemptionReasonCode")
+                    exemp_text = _txt(tax, f"{ram}ExemptionReason")
+                    if not exemp_code and not exemp_text:
+                        self._err("BR-E-10",
+                            f"BG-23 / TVA {i} : Catégorie E (exonéré de TVA) exige "
+                            f"ExemptionReasonCode ou ExemptionReason")
+
+                # BR-G-10 : Catégorie G exige un motif d'exonération
+                if cat == "G":
+                    exemp_code = _txt(tax, f"{ram}ExemptionReasonCode")
+                    exemp_text = _txt(tax, f"{ram}ExemptionReason")
+                    if not exemp_code and not exemp_text:
+                        self._err("BR-G-10",
+                            f"BG-23 / TVA {i} : Catégorie G (export) exige "
+                            f"ExemptionReasonCode ou ExemptionReason")
+
                 if rate > Decimal("0") and taxable > Decimal("0"):
                     expected = (taxable * rate / Decimal("100")).quantize(
                         Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -979,6 +1093,13 @@ class InvoiceValidator:
                         self._warn("BR-CO-17",
                             f"BG-23 / TVA {i} : Montant TVA déclaré ({tax_amt}) ≠ "
                             f"base imposable ({taxable}) × taux ({rate}%) / 100 = {expected}")
+
+        # BR-O-11 : La catégorie O ne peut pas coexister avec d'autres catégories TVA
+        all_cats_cii = [_txt(t, f"{ram}CategoryCode") for t in tax_els]
+        if "O" in all_cats_cii and len(set(c for c in all_cats_cii if c)) > 1:
+            self._err("BR-O-11",
+                "BG-23 : La catégorie O (hors champ TVA) ne peut pas coexister "
+                "avec d'autres catégories TVA dans la même facture")
 
         # Vérification de TaxTotalAmount avec currencyID (EN16931 / Factur-X)
         sms = hts.find(f"{ram}SpecifiedTradeSettlementHeaderMonetarySummation")
