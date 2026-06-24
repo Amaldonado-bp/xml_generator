@@ -492,6 +492,10 @@ def build_cii(d: dict, profile: str = "EN16931") -> str:
         la = ET.SubElement(li, ram("SpecifiedLineTradeAgreement"))
         np_ = ET.SubElement(la, ram("NetPriceProductTradePrice"))
         _t(np_, ram("ChargeAmount"), f"{float(line['unit_price']):.2f}")
+        if line.get("base_quantity"):
+            bq_el = ET.SubElement(np_, ram("BasisQuantity"))
+            bq_el.text = str(line["base_quantity"])
+            bq_el.set("unitCode", line.get("unit_code", "EA"))
         ld = ET.SubElement(li, ram("SpecifiedLineTradeDelivery"))
         bq = ET.SubElement(ld, ram("BilledQuantity"))
         bq.text = str(line["quantity"])
