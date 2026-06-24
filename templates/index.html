@@ -323,6 +323,23 @@
               <label class="form-label">Note libre <span class="badge bg-secondary badge-req">BT-22</span></label>
               <input id="inv_note" class="form-control">
             </div>
+
+            <!-- Champs avoirs — affichés uniquement pour codes 381/261/296 -->
+            <div id="avoirFields" class="col-12" style="display:none">
+              <div class="row g-3 mt-0 p-2 rounded" style="background:rgba(255,61,71,.07);border:1px solid rgba(255,61,71,.25)">
+                <div class="col-12">
+                  <span class="fw-semibold" style="color:var(--bp-red);font-size:.85rem;">↩ Avoir — référence à la facture initiale</span>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">N° facture initiale <span class="badge bg-danger badge-req">BT-25</span></label>
+                  <input id="inv_preceding_ref" class="form-control" placeholder="FACT-202601-001">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Date facture initiale <span class="badge bg-danger badge-req">BT-26</span></label>
+                  <input id="inv_preceding_date" class="form-control" type="date">
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -760,6 +777,7 @@ function onTypeChange() {
   const code    = document.getElementById('inv_type_code').value;
   const isAvoir = _avoirCodes.has(code);
   document.getElementById('pageHeader').className = 'page-header mb-0' + (isAvoir ? ' avoir' : '');
+  document.getElementById('avoirFields').style.display = isAvoir ? '' : 'none';
   const idField = document.getElementById('inv_id');
   const prefix  = _typePrefix[code] || 'FACT';
   const d = new Date();
@@ -810,6 +828,14 @@ function validateRequired() {
 
   if (!noLines && document.querySelectorAll('#lineItems tr').length === 0)
     missing.push({ id:null, label:'Au moins une ligne de facture', bt:'BG-25', section:'Lignes' });
+
+  const typeCode = document.getElementById('inv_type_code').value;
+  if (_avoirCodes.has(typeCode)) {
+    const prEl = document.getElementById('inv_preceding_ref');
+    const pdEl = document.getElementById('inv_preceding_date');
+    if (prEl && !prEl.value.trim()) { prEl.classList.add('is-invalid'); missing.push({ id:'inv_preceding_ref', label:'N° facture initiale', bt:'BT-25', section:'Avoir' }); }
+    if (pdEl && !pdEl.value.trim()) { pdEl.classList.add('is-invalid'); missing.push({ id:'inv_preceding_date', label:'Date facture initiale', bt:'BT-26', section:'Avoir' }); }
+  }
 
   return missing;
 }
@@ -1066,6 +1092,8 @@ function collectData() {
       buyer_reference: v('inv_buyer_reference'), buyer_accounting_ref: v('inv_buyer_accounting_ref'),
       purchase_order_ref: v('inv_purchase_order_ref'), contract_ref: v('inv_contract_ref'),
       note: v('inv_note'), payment_terms_note: v('inv_payment_terms_note'),
+      preceding_invoice_ref:  v('inv_preceding_ref'),
+      preceding_invoice_date: v('inv_preceding_date'),
     },
     supplier: {
       name: v('sup_name'), vat_id: v('sup_vat_id'), company_id: v('sup_company_id'),

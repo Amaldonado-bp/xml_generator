@@ -85,6 +85,17 @@ def validate_data(d: dict, profile: str = "EN16931") -> list:
                       f"(codes acceptés Factur-X 1.09 : 380=facture, 381=avoir, 384=corrective, "
                       f"389=autofacturation, 326=partielle, 386=acompte, ...)")
 
+    # ── BT-25/26 : Référence facture initiale (obligatoire pour avoirs) ─
+    _AVOIR_CODES = {"381", "261", "296"}
+    if type_code in _AVOIR_CODES:
+        if not inv.get("preceding_invoice_ref", "").strip():
+            errors.append("BT-25 : Le numéro de la facture initiale est obligatoire pour un avoir")
+        prec_date = inv.get("preceding_invoice_date", "").strip()
+        if not prec_date:
+            errors.append("BT-26 : La date de la facture initiale est obligatoire pour un avoir")
+        elif not re.match(r"^\d{4}-\d{2}-\d{2}$", prec_date):
+            errors.append(f"BT-26 : Format de date invalide '{prec_date}' (attendu AAAA-MM-JJ)")
+
     # ── BT-5 : Code monnaie ──────────────────────────────────────────
     currency = str(inv.get("currency", "")).strip()
     if not currency:
@@ -278,6 +289,13 @@ def build_ubl(d: dict, profile: str = "EN16931", peppol: bool = False) -> str:
     if inv.get("contract_ref"):
         cr = ET.SubElement(root, cac("ContractDocumentReference"))
         _t(cr, cbc("ID"), inv["contract_ref"])                             # BT-12
+
+    if inv.get("preceding_invoice_ref"):                                   # BT-25/26
+        br  = ET.SubElement(root, cac("BillingReference"))
+        idr = ET.SubElement(br, cac("InvoiceDocumentReference"))
+        _t(idr, cbc("ID"), inv["preceding_invoice_ref"])
+        if inv.get("preceding_invoice_date"):
+            _t(idr, cbc("IssueDate"), inv["preceding_invoice_date"])
 
     # ── BG-4 Fournisseur ─────────────────────────────────────────────
     asp = ET.SubElement(root, cac("AccountingSupplierParty"))
@@ -544,6 +562,15 @@ def build_cii(d: dict, profile: str = "EN16931") -> str:
         _t(ET.SubElement(hta, ram("BuyerOrderReferencedDocument")), ram("IssuerAssignedID"), inv["purchase_order_ref"])
     if inv.get("contract_ref"):
         _t(ET.SubElement(hta, ram("ContractReferencedDocument")), ram("IssuerAssignedID"), inv["contract_ref"])
+
+    if inv.get("preceding_invoice_ref"):                                   # BT-25/26
+        ird = ET.SubElement(hta, ram("InvoiceReferencedDocument"))
+        _t(ird, ram("IssuerAssignedID"), inv["preceding_invoice_ref"])
+        if inv.get("preceding_invoice_date"):
+            fidt = ET.SubElement(ird, ram("FormattedIssueDateTime"))
+            dts2 = ET.SubElement(fidt, udt("DateTimeString"))
+            dts2.text = inv["preceding_invoice_date"].replace("-", "")
+            dts2.set("format", "102")
 
     # ApplicableHeaderTradeDelivery (obligatoire CII)
     ET.SubElement(sctt, ram("ApplicableHeaderTradeDelivery"))
