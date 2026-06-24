@@ -182,7 +182,7 @@
         Générateur de Factures Électroniques - by BearingPoint
       </h5>
       <small style="color:rgba(255,255,255,.6);font-size:.78rem;">
-        UBL 2.1 / CII D16B (Factur-X) — Norme EN16931 / AFNOR XP Z12-014
+        UBL 2.1 / CII D22B (Factur-X 1.09) — Norme EN16931 / AFNOR XP Z12-014
       </small>
     </div>
   </div>
@@ -588,15 +588,31 @@
                 <div class="form-check">
                   <input class="form-check-input" type="radio" name="outputFormat" id="fmt_cii" value="cii">
                   <label class="form-check-label" for="fmt_cii">
-                    <span class="fw-semibold">CII D16B</span>
-                    <div class="text-muted" style="font-size:.75em">Factur-X / ZUGFeRD</div>
+                    <span class="fw-semibold">CII D22B</span>
+                    <div class="text-muted" style="font-size:.75em">Factur-X 1.09 / ZUGFeRD</div>
                   </label>
                 </div>
               </div>
             </div>
-            <div class="col-md-auto ms-md-auto">
+            <div class="col-md-auto">
+              <label class="form-label mb-1 fw-semibold">Profil Factur-X</label>
+              <select id="facturx_profile" class="form-select" style="min-width:160px" onchange="onProfileChange()">
+                <option value="EN16931" selected>EN16931 — Standard</option>
+                <option value="EXTENDED">EXTENDED — Étendu</option>
+                <option value="BASIC">BASIC</option>
+                <option value="BASICWL">BASIC WL — Sans lignes</option>
+                <option value="MINIMUM">MINIMUM — Minimal</option>
+              </select>
+              <div id="profileHint" class="text-muted mt-1" style="font-size:.72rem;">Factures complètes avec lignes détaillées</div>
+            </div>
+            <div class="col-md-auto ms-md-auto d-flex flex-column gap-2 justify-content-end">
               <button type="submit" class="btn btn-success btn-generate" id="generateBtn">
-                ⬇&nbsp; Générer et télécharger le XML
+                ⬇&nbsp; Télécharger le XML
+              </button>
+              <button type="button" class="btn btn-generate" id="pdfBtn"
+                      onclick="generatePdf()"
+                      style="background:var(--bp-red);color:#fff;border:none;">
+                📋&nbsp; Exporter Factur-X PDF/A-3
               </button>
             </div>
           </div>
@@ -855,10 +871,35 @@ function fmtEur(n) { return n.toLocaleString('fr-FR', { minimumFractionDigits: 2
 function round2(n) { return Math.round(n * 100) / 100; }
 function v(id)     { return (document.getElementById(id)?.value || '').trim(); }
 
+// ── Profil Factur-X ───────────────────────────────────────────────────
+const _profileHints = {
+  'EN16931':  'Factures complètes avec lignes détaillées',
+  'EXTENDED': 'Profil étendu AFNOR — champs additionnels',
+  'BASIC':    'Profil de base — lignes requises',
+  'BASICWL':  'Sans lignes de détail — totaux uniquement',
+  'MINIMUM':  'Profil minimal — données essentielles uniquement',
+};
+function onProfileChange() {
+  const p    = document.getElementById('facturx_profile').value;
+  const hint = document.getElementById('profileHint');
+  if (hint) hint.textContent = _profileHints[p] || '';
+  // Pour MINIMUM/BASICWL, forcer CII (Factur-X exige CII)
+  const noLines = p === 'MINIMUM' || p === 'BASICWL';
+  if (noLines) {
+    document.getElementById('fmt_cii').checked = true;
+    document.getElementById('fmt_ubl').disabled = true;
+    document.getElementById('fmt_cii').disabled = true;
+  } else {
+    document.getElementById('fmt_ubl').disabled = false;
+    document.getElementById('fmt_cii').disabled = false;
+  }
+}
+
 // ── Collecte des données ──────────────────────────────────────────────
 function collectData() {
-  const c   = window._calc || {};
-  const fmt = document.querySelector('input[name=outputFormat]:checked').value;
+  const c       = window._calc || {};
+  const fmt     = document.querySelector('input[name=outputFormat]:checked').value;
+  const profile = document.getElementById('facturx_profile').value;
   const lines = [];
   document.querySelectorAll('#lineItems tr').forEach((row, idx) => {
     lines.push({
@@ -891,6 +932,7 @@ function collectData() {
     .map(g => ({ taxable_amount: round2(g.taxable), tax_amount: round2(g.tax), category: g.cat, rate: g.rate }));
   return {
     _format: fmt,
+    _profile: profile,
     invoice: {
       id: v('inv_id'), issue_date: v('inv_issue_date'), due_date: v('inv_due_date'),
       type_code: v('inv_type_code'), currency: v('inv_currency'),
@@ -977,6 +1019,72 @@ document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Génération PDF Factur-X ───────────────────────────────────────────
+async function generatePdf() {
+  const form  = document.getElementById('invoiceForm');
+  if (!form.checkValidity()) {
+    form.classList.add('was-validated');
+    form.querySelector(':invalid')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  const btn   = document.getElementById('pdfBtn');
+  const alert = document.getElementById('alertMsg');
+  alert.style.display = 'none';
+  btn.disabled  = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Génération PDF…';
+
+  // Forcer CII pour le PDF Factur-X
+  const payload = { ...collectData(), _format: 'cii' };
+  delete payload._format;  // /generate-pdf n'utilise pas _format
+
+  try {
+    const resp = await fetch('/generate-pdf', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (resp.status === 422) {
+      const data = await resp.json();
+      const items = (data.errors || []).map(e => `<li class="mb-1">${escHtml(e)}</li>`).join('');
+      alert.innerHTML = `<div class="alert alert-danger mb-0">
+        <strong>⚠️ Données invalides :</strong>
+        <ul class="mb-0 mt-2 ps-3">${items}</ul></div>`;
+      alert.style.display = '';
+      return;
+    }
+    if (resp.status === 503) {
+      const data = await resp.json();
+      alert.innerHTML = `<div class="alert alert-warning mb-0">⚠️ ${escHtml(data.error || 'Service indisponible')}</div>`;
+      alert.style.display = '';
+      return;
+    }
+    if (!resp.ok) {
+      const err = await resp.text();
+      alert.innerHTML = `<div class="alert alert-danger mb-0">⚠️ ${escHtml(err)}</div>`;
+      alert.style.display = '';
+      return;
+    }
+    const blob = await resp.blob();
+    const cd   = resp.headers.get('Content-Disposition') || '';
+    const fn   = cd.includes('filename=') ? cd.split('filename=')[1].replace(/"/g,'') : 'facture_facturx.pdf';
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = fn; a.click();
+    URL.revokeObjectURL(url);
+    const profile = document.getElementById('facturx_profile').value;
+    alert.innerHTML = `<div class="alert alert-success mb-0">
+      ✅ PDF Factur-X téléchargé : <strong>${escHtml(fn)}</strong>
+      <small class="ms-2 text-muted">(profil ${escHtml(profile)}, XML CII D22B embarqué, XMP PDF/A-3b)</small>
+    </div>`;
+    alert.style.display = '';
+  } catch (err) {
+    alert.innerHTML = `<div class="alert alert-danger mb-0">⚠️ Erreur réseau : ${escHtml(err.message)}</div>`;
+    alert.style.display = '';
+  } finally {
+    btn.disabled  = false;
+    btn.innerHTML = '📋&nbsp; Exporter Factur-X PDF/A-3';
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1077,8 +1185,9 @@ function renderResults(data) {
   const warns   = data.warnings || [];
   const isValid = data.valid;
 
+  const profileLabel = data.profile ? ` · ${escHtml(data.profile)}` : '';
   const fmtLabel = data.format === 'UBL' ? 'UBL 2.1'
-                 : data.format === 'CII' ? 'CII D16B'
+                 : data.format === 'CII' ? `CII D22B${profileLabel}`
                  : 'Format inconnu';
 
   const errCount  = errors.length;

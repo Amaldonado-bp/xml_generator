@@ -129,6 +129,7 @@ def validate_xml():
     result = {
         "filename": file.filename,
         "format":   validator.fmt,
+        "profile":  validator.profile,
         "valid":    len(errors) == 0,
         "errors":   errors,
         "warnings": warnings,
