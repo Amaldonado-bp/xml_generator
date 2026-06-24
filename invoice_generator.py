@@ -337,6 +337,12 @@ def build_ubl(d: dict, profile: str = "EN16931", peppol: bool = False) -> str:
     if buyer.get("contact"):
         _ubl_contact(bp, buyer["contact"], cac, cbc)
 
+    # ── BG-10 Bénéficiaire ───────────────────────────────────────────
+    if payment.get("account_name"):                                        # BT-59
+        pp  = ET.SubElement(root, cac("PayeeParty"))
+        ppn = ET.SubElement(pp, cac("PartyName"))
+        _t(ppn, cbc("Name"), payment["account_name"])
+
     # ── BG-16 Paiement ───────────────────────────────────────────────
     if payment.get("means_code"):
         pm = ET.SubElement(root, cac("PaymentMeans"))
@@ -584,6 +590,8 @@ def build_cii(d: dict, profile: str = "EN16931") -> str:
         if payment.get("iban"):
             pfa = ET.SubElement(pm, ram("PayeePartyCreditorFinancialAccount"))
             _t(pfa, ram("IBANID"), payment["iban"])
+            if payment.get("account_name"):
+                _t(pfa, ram("AccountName"), payment["account_name"])       # BT-85
         if payment.get("bic"):
             fi = ET.SubElement(pm, ram("PayeeSpecifiedCreditorFinancialInstitution"))
             _t(fi, ram("BICID"), payment["bic"])
