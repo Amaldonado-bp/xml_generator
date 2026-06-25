@@ -782,6 +782,14 @@ function onTypeChange() {
   const isAvoir = _avoirCodes.has(code);
   document.getElementById('pageHeader').className = 'page-header mb-0' + (isAvoir ? ' avoir' : '');
   document.getElementById('avoirFields').style.display = isAvoir ? '' : 'none';
+  // Effacer les champs avoir si on quitte un type avoir — évite qu'ils
+  // se retrouvent dans le XML d'une facture normale
+  if (!isAvoir) {
+    const pr = document.getElementById('inv_preceding_ref');
+    const pd = document.getElementById('inv_preceding_date');
+    if (pr) pr.value = '';
+    if (pd) pd.value = '';
+  }
   const idField = document.getElementById('inv_id');
   const prefix  = _typePrefix[code] || 'FACT';
   const d = new Date();
