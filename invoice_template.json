@@ -13,7 +13,7 @@
     "sales_order_ref":      "",
     "contract_ref":         "",
     "note":                 "",
-    "payment_terms_note":   ""
+    "payment_terms_note":   "30 jours nets"
   },
 
   "supplier": {
@@ -21,10 +21,10 @@
     "endpoint_scheme": "0088",
     "name":            "",
     "address": {
-      "street":            "",
+      "street":            "1 rue de la Paix",
       "additional_street": "",
-      "city":              "",
-      "postal_zone":       "",
+      "city":              "PARIS",
+      "postal_zone":       "75001",
       "country_code":      "FR"
     },
     "vat_id":     "",
