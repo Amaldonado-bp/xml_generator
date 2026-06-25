@@ -312,6 +312,10 @@
               <input id="inv_purchase_order_ref" class="form-control" placeholder="PO-12345">
             </div>
             <div class="col-md-3">
+              <label class="form-label">N° commande vendeur <span class="badge bg-secondary badge-req">BT-14</span></label>
+              <input id="inv_sales_order_ref" class="form-control" placeholder="SO-12345">
+            </div>
+            <div class="col-md-3">
               <label class="form-label">N° contrat <span class="badge bg-secondary badge-req">BT-12</span></label>
               <input id="inv_contract_ref" class="form-control">
             </div>
@@ -483,9 +487,9 @@
       <div class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span><span class="icon">💳</span>Paiement <span class="badge bg-secondary ms-1" style="font-size:.7em">optionnel</span></span>
-          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSection('paymentBody', this)">Afficher ▼</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSection('paymentBody', this)">Masquer ▲</button>
         </div>
-        <div id="paymentBody" class="card-body" style="display:none">
+        <div id="paymentBody" class="card-body">
           <div class="row g-3">
             <div class="col-md-2">
               <label class="form-label">Mode <span class="badge bg-secondary badge-req">BT-81</span></label>
@@ -1090,7 +1094,7 @@ function collectData() {
       id: v('inv_id'), issue_date: v('inv_issue_date'), due_date: v('inv_due_date'),
       type_code: v('inv_type_code'), currency: v('inv_currency'),
       buyer_reference: v('inv_buyer_reference'), buyer_accounting_ref: v('inv_buyer_accounting_ref'),
-      purchase_order_ref: v('inv_purchase_order_ref'), contract_ref: v('inv_contract_ref'),
+      purchase_order_ref: v('inv_purchase_order_ref'), sales_order_ref: v('inv_sales_order_ref'), contract_ref: v('inv_contract_ref'),
       note: v('inv_note'), payment_terms_note: v('inv_payment_terms_note'),
       preceding_invoice_ref:  v('inv_preceding_ref'),
       preceding_invoice_date: v('inv_preceding_date'),
