@@ -654,42 +654,34 @@
           <div class="row align-items-center g-3">
             <div class="col-md-auto">
               <label class="form-label mb-1 fw-semibold">Format de sortie</label>
-              <div class="d-flex gap-4 mt-1">
+              <div class="d-flex gap-3 mt-1 flex-wrap align-items-start">
                 <div class="form-check">
-                  <input class="form-check-input" type="radio" name="outputFormat" id="fmt_ubl" value="ubl" checked>
-                  <label class="form-check-label" for="fmt_ubl">
-                    <span class="fw-semibold">UBL 2.1</span>
-                    <div class="text-muted" style="font-size:.75em">Coupa, Chorus Pro…</div>
-                  </label>
+                  <input class="form-check-input" type="radio" name="outputFormat" id="fmt_ubl" value="ubl" checked onchange="onFormatChange()">
+                  <label class="form-check-label fw-semibold" for="fmt_ubl">UBL 2.1</label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="radio" name="outputFormat" id="fmt_cii" value="cii">
-                  <label class="form-check-label" for="fmt_cii">
-                    <span class="fw-semibold">CII D22B</span>
-                    <div class="text-muted" style="font-size:.75em">Factur-X 1.09 / ZUGFeRD</div>
-                  </label>
+                  <input class="form-check-input" type="radio" name="outputFormat" id="fmt_cii" value="cii" onchange="onFormatChange()">
+                  <label class="form-check-label fw-semibold" for="fmt_cii">CII D22B</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="outputFormat" id="fmt_facturx" value="facturx" onchange="onFormatChange()">
+                  <label class="form-check-label fw-semibold" for="fmt_facturx">Factur-X PDF/A-3</label>
+                </div>
+                <div id="facturxProfileBlock" style="display:none;margin-top:-.15rem">
+                  <select id="facturx_profile" class="form-select form-select-sm" style="min-width:155px" onchange="onProfileChange()">
+                    <option value="EN16931" selected>EN16931 — Standard</option>
+                    <option value="EXTENDED">EXTENDED — Étendu</option>
+                    <option value="BASIC">BASIC</option>
+                    <option value="BASICWL">BASIC WL — Sans lignes</option>
+                    <option value="MINIMUM">MINIMUM — Minimal</option>
+                  </select>
+                  <div id="profileHint" class="text-muted mt-1" style="font-size:.72rem;">Factures complètes avec lignes détaillées</div>
                 </div>
               </div>
             </div>
-            <div class="col-md-auto">
-              <label class="form-label mb-1 fw-semibold">Profil Factur-X</label>
-              <select id="facturx_profile" class="form-select" style="min-width:160px" onchange="onProfileChange()">
-                <option value="EN16931" selected>EN16931 — Standard</option>
-                <option value="EXTENDED">EXTENDED — Étendu</option>
-                <option value="BASIC">BASIC</option>
-                <option value="BASICWL">BASIC WL — Sans lignes</option>
-                <option value="MINIMUM">MINIMUM — Minimal</option>
-              </select>
-              <div id="profileHint" class="text-muted mt-1" style="font-size:.72rem;">Factures complètes avec lignes détaillées</div>
-            </div>
-            <div class="col-md-auto ms-md-auto d-flex flex-column gap-2 justify-content-end">
+            <div class="col-md-auto ms-md-auto d-flex align-items-end">
               <button type="submit" class="btn btn-success btn-generate" id="generateBtn">
-                ⬇&nbsp; Télécharger le XML
-              </button>
-              <button type="button" class="btn btn-generate" id="pdfBtn"
-                      onclick="generatePdf()"
-                      style="background:var(--bp-red);color:#fff;border:none;">
-                📋&nbsp; Exporter Factur-X PDF/A-3
+                ⬇&nbsp; Télécharger
               </button>
             </div>
           </div>
@@ -825,7 +817,7 @@ function validateRequired() {
     if (el) el.classList.remove('is-invalid');
   });
 
-  const profile = document.getElementById('facturx_profile').value;
+  const profile = getEffectiveProfile();
   const noLines = ['MINIMUM','BASICWL'].includes(profile);
   const missing = [];
 
@@ -1043,27 +1035,30 @@ const _profileHints = {
   'BASICWL':  'Sans lignes de détail — totaux uniquement',
   'MINIMUM':  'Profil minimal — données essentielles uniquement',
 };
+function onFormatChange() {
+  const fmt     = document.querySelector('input[name=outputFormat]:checked').value;
+  const block   = document.getElementById('facturxProfileBlock');
+  block.style.display = fmt === 'facturx' ? '' : 'none';
+}
+
+function getEffectiveProfile() {
+  const fmt = document.querySelector('input[name=outputFormat]:checked')?.value;
+  if (fmt === 'facturx') return document.getElementById('facturx_profile').value;
+  return 'EN16931';
+}
+
 function onProfileChange() {
   const p    = document.getElementById('facturx_profile').value;
   const hint = document.getElementById('profileHint');
   if (hint) hint.textContent = _profileHints[p] || '';
-  // Pour MINIMUM/BASICWL, forcer CII (Factur-X exige CII)
-  const noLines = p === 'MINIMUM' || p === 'BASICWL';
-  if (noLines) {
-    document.getElementById('fmt_cii').checked = true;
-    document.getElementById('fmt_ubl').disabled = true;
-    document.getElementById('fmt_cii').disabled = true;
-  } else {
-    document.getElementById('fmt_ubl').disabled = false;
-    document.getElementById('fmt_cii').disabled = false;
-  }
 }
 
 // ── Collecte des données ──────────────────────────────────────────────
 function collectData() {
   const c       = window._calc || {};
-  const fmt     = document.querySelector('input[name=outputFormat]:checked').value;
-  const profile = document.getElementById('facturx_profile').value;
+  const fmtRaw  = document.querySelector('input[name=outputFormat]:checked').value;
+  const fmt     = fmtRaw === 'facturx' ? 'cii' : fmtRaw;   // facturx → CII pour le backend
+  const profile = getEffectiveProfile();
   const lines = [];
   document.querySelectorAll('#lineItems tr').forEach((row, idx) => {
     lines.push({
@@ -1132,74 +1127,25 @@ function collectData() {
   };
 }
 
-// ── Soumission formulaire ─────────────────────────────────────────────
+// ── Soumission formulaire (XML ou Factur-X PDF selon format choisi) ───
 document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const missing = validateRequired();
   if (missing.length) { showValidationErrors(missing); return; }
+
+  const isFacturX = document.querySelector('input[name=outputFormat]:checked').value === 'facturx';
   const btn   = document.getElementById('generateBtn');
   const alert = document.getElementById('alertMsg');
   alert.style.display = 'none';
-  btn.disabled    = true;
-  btn.innerHTML   = '<span class="spinner-border spinner-border-sm me-2"></span>Génération en cours…';
-  try {
-    const resp = await fetch('/generate', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(collectData()),
-    });
-    if (resp.status === 422) {
-      const data = await resp.json();
-      const items = (data.errors || []).map(e => `<li class="mb-1">${escHtml(e)}</li>`).join('');
-      alert.innerHTML = `<div class="alert alert-danger mb-0">
-        <strong>⚠️ Données invalides — corrigez les erreurs suivantes :</strong>
-        <ul class="mb-0 mt-2 ps-3">${items}</ul></div>`;
-      alert.style.display = '';
-      return;
-    }
-    if (!resp.ok) {
-      const err = await resp.text();
-      alert.innerHTML = `<div class="alert alert-danger mb-0">⚠️ ${escHtml(err)}</div>`;
-      alert.style.display = '';
-      return;
-    }
-    const blob = await resp.blob();
-    const cd   = resp.headers.get('Content-Disposition') || '';
-    const fn   = cd.includes('filename=') ? cd.split('filename=')[1].replace(/"/g, '') : 'facture.xml';
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = fn; a.click();
-    URL.revokeObjectURL(url);
-    alert.innerHTML = `<div class="alert alert-success mb-0">✅ Fichier téléchargé : <strong>${escHtml(fn)}</strong></div>`;
-    alert.style.display = '';
-  } catch (err) {
-    alert.innerHTML = `<div class="alert alert-danger mb-0">⚠️ Erreur réseau : ${escHtml(err.message)}</div>`;
-    alert.style.display = '';
-  } finally {
-    btn.disabled  = false;
-    btn.innerHTML = '⬇&nbsp; Générer et télécharger le XML';
-  }
-});
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ── Génération PDF Factur-X ───────────────────────────────────────────
-async function generatePdf() {
-  const missing = validateRequired();
-  if (missing.length) { showValidationErrors(missing); return; }
-  const btn   = document.getElementById('pdfBtn');
-  const alert = document.getElementById('alertMsg');
-  alert.style.display = 'none';
   btn.disabled  = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Génération PDF…';
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${isFacturX ? 'Génération Factur-X…' : 'Génération en cours…'}`;
 
-  // Forcer CII pour le PDF Factur-X
-  const payload = { ...collectData(), _format: 'cii' };
-  delete payload._format;  // /generate-pdf n'utilise pas _format
+  const payload = collectData();
+  if (isFacturX) delete payload._format;   // /generate-pdf n'utilise pas _format
+  const endpoint = isFacturX ? '/generate-pdf' : '/generate';
 
   try {
-    const resp = await fetch('/generate-pdf', {
+    const resp = await fetch(endpoint, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
@@ -1207,7 +1153,7 @@ async function generatePdf() {
       const data = await resp.json();
       const items = (data.errors || []).map(e => `<li class="mb-1">${escHtml(e)}</li>`).join('');
       alert.innerHTML = `<div class="alert alert-danger mb-0">
-        <strong>⚠️ Données invalides :</strong>
+        <strong>⚠️ Données invalides — corrigez les erreurs suivantes :</strong>
         <ul class="mb-0 mt-2 ps-3">${items}</ul></div>`;
       alert.style.display = '';
       return;
@@ -1226,24 +1172,27 @@ async function generatePdf() {
     }
     const blob = await resp.blob();
     const cd   = resp.headers.get('Content-Disposition') || '';
-    const fn   = cd.includes('filename=') ? cd.split('filename=')[1].replace(/"/g,'') : 'facture_facturx.pdf';
+    const fn   = cd.includes('filename=') ? cd.split('filename=')[1].replace(/"/g,'') : (isFacturX ? 'facture_facturx.pdf' : 'facture.xml');
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href = url; a.download = fn; a.click();
     URL.revokeObjectURL(url);
-    const profile = document.getElementById('facturx_profile').value;
-    alert.innerHTML = `<div class="alert alert-success mb-0">
-      ✅ PDF Factur-X téléchargé : <strong>${escHtml(fn)}</strong>
-      <small class="ms-2 text-muted">(profil ${escHtml(profile)}, XML CII D22B embarqué, XMP PDF/A-3b)</small>
-    </div>`;
+    const successMsg = isFacturX
+      ? `✅ PDF Factur-X téléchargé : <strong>${escHtml(fn)}</strong> <small class="ms-2 text-muted">(${escHtml(getEffectiveProfile())}, CII D22B, PDF/A-3b)</small>`
+      : `✅ Fichier téléchargé : <strong>${escHtml(fn)}</strong>`;
+    alert.innerHTML = `<div class="alert alert-success mb-0">${successMsg}</div>`;
     alert.style.display = '';
   } catch (err) {
     alert.innerHTML = `<div class="alert alert-danger mb-0">⚠️ Erreur réseau : ${escHtml(err.message)}</div>`;
     alert.style.display = '';
   } finally {
     btn.disabled  = false;
-    btn.innerHTML = '📋&nbsp; Exporter Factur-X PDF/A-3';
+    btn.innerHTML = '⬇&nbsp; Télécharger';
   }
+});
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1426,9 +1375,6 @@ function renderResults(data) {
          style="height:18px;filter:brightness(0) invert(1);" alt="BearingPoint">
     <span style="color:rgba(255,255,255,.5);font-size:.78rem;">
       © 2026 BearingPoint GmbH. Tous droits réservés.
-    </span>
-    <span style="color:rgba(255,255,255,.3);font-size:.73rem;margin-left:auto;">
-      EN16931 · AFNOR XP Z12-014 · Factur-X
     </span>
   </div>
 </footer>
