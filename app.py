@@ -4,6 +4,7 @@ import io
 import os
 import sys
 import tempfile
+import zipfile as zipmod
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -94,6 +95,33 @@ def generate_pdf():
                      mimetype="application/pdf")
 
 
+def _validate_xml_bytes(xml_bytes: bytes, filename: str) -> dict:
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".xml")
+    try:
+        os.close(tmp_fd)
+        with open(tmp_path, "wb") as f:
+            f.write(xml_bytes)
+        validator = InvoiceValidator(tmp_path)
+        issues    = validator.validate()
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+    errors   = [{"code": i.code, "message": i.message, "location": i.location}
+                for i in issues if i.severity == "ERROR"]
+    warnings = [{"code": i.code, "message": i.message, "location": i.location}
+                for i in issues if i.severity == "WARNING"]
+    return {
+        "filename": filename,
+        "format":   validator.fmt,
+        "profile":  validator.profile,
+        "valid":    len(errors) == 0,
+        "errors":   errors,
+        "warnings": warnings,
+    }
+
+
 @app.route("/validate", methods=["POST"])
 def validate_xml():
     if "file" not in request.files:
@@ -107,35 +135,46 @@ def validate_xml():
             json.dumps({"error": "Nom de fichier manquant"}, ensure_ascii=False),
             status=400, content_type="application/json; charset=utf-8"
         )
-
-    # Sauvegarde temporaire pour le validateur
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".xml")
-    try:
-        os.close(tmp_fd)
-        file.save(tmp_path)
-        validator = InvoiceValidator(tmp_path)
-        issues    = validator.validate()
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-
-    errors   = [{"code": i.code, "message": i.message, "location": i.location}
-                for i in issues if i.severity == "ERROR"]
-    warnings = [{"code": i.code, "message": i.message, "location": i.location}
-                for i in issues if i.severity == "WARNING"]
-
-    result = {
-        "filename": file.filename,
-        "format":   validator.fmt,
-        "profile":  validator.profile,
-        "valid":    len(errors) == 0,
-        "errors":   errors,
-        "warnings": warnings,
-    }
+    result = _validate_xml_bytes(file.read(), file.filename)
     return Response(
         json.dumps(result, ensure_ascii=False),
+        status=200,
+        content_type="application/json; charset=utf-8"
+    )
+
+
+@app.route("/validate-batch", methods=["POST"])
+def validate_batch():
+    files = request.files.getlist("files[]")
+    if not files:
+        return Response(
+            json.dumps({"error": "Aucun fichier fourni"}, ensure_ascii=False),
+            status=400, content_type="application/json; charset=utf-8"
+        )
+    results = []
+    for file in files:
+        fname = file.filename or "fichier.xml"
+        if fname.lower().endswith(".zip"):
+            zip_bytes = file.read()
+            try:
+                with zipmod.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                    for name in sorted(zf.namelist()):
+                        if name.lower().endswith(".xml") and not name.startswith("__MACOSX"):
+                            xml_bytes = zf.read(name)
+                            basename  = name.rsplit("/", 1)[-1]
+                            results.append(_validate_xml_bytes(xml_bytes, basename))
+            except zipmod.BadZipFile:
+                results.append({
+                    "filename": fname, "format": None, "profile": None, "valid": False,
+                    "errors":   [{"code": "ZIP-ERR",
+                                  "message": "Fichier ZIP invalide ou corrompu",
+                                  "location": ""}],
+                    "warnings": [],
+                })
+        else:
+            results.append(_validate_xml_bytes(file.read(), fname))
+    return Response(
+        json.dumps({"results": results}, ensure_ascii=False),
         status=200,
         content_type="application/json; charset=utf-8"
     )

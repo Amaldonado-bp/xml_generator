@@ -103,7 +103,7 @@
     .drop-zone.has-file .dz-file    { display: block; }
     .drop-zone.has-file .dz-default { opacity: .45; }
 
-    /* Results panel — visibility managed entirely via JS style.display */
+    /* Results panel -visibility managed entirely via JS style.display */
 
     .result-header {
       display: flex; align-items: center; flex-wrap: wrap; gap: .6rem;
@@ -210,9 +210,9 @@
             Pays
           </label>
           <select id="countryCtx" class="country-select" onchange="onCountryChange()">
-            <option value="FR" selected>🇫🇷 France — AFNOR XP Z12-014 (Fév. 2026)</option>
-            <option value="DE" disabled>🇩🇪 Allemagne — XRechnung (bientôt)</option>
-            <option value="IT" disabled>🇮🇹 Italie — SDI FatturaPA (bientôt)</option>
+            <option value="FR" selected>🇫🇷 France - AFNOR XP Z12-014 (Fév. 2026)</option>
+            <option value="DE" disabled>🇩🇪 Allemagne - XRechnung (bientôt)</option>
+            <option value="IT" disabled>🇮🇹 Italie - SDI FatturaPA (bientôt)</option>
             <option value="BE" disabled>🇧🇪 Belgique (bientôt)</option>
             <option value="ES" disabled>🇪🇸 Espagne (bientôt)</option>
             <option value="NL" disabled>🇳🇱 Pays-Bas (bientôt)</option>
@@ -251,7 +251,7 @@
   <div class="tab-content">
 
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <!--  ONGLET 1 — GÉNÉRATEUR                                        -->
+    <!--  ONGLET 1 -GÉNÉRATEUR                                        -->
     <!-- ══════════════════════════════════════════════════════════════ -->
     <div class="tab-pane fade show active" id="tab-generator" role="tabpanel">
     <form id="invoiceForm" novalidate>
@@ -279,22 +279,22 @@
               <label class="form-label">Type <span class="badge bg-danger badge-req">BT-3</span></label>
               <select id="inv_type_code" class="form-select" onchange="onTypeChange()">
                 <optgroup label="Factures">
-                  <option value="380">380 — Facture commerciale</option>
-                  <option value="326">326 — Facture partielle</option>
-                  <option value="386">386 — Facture d'acompte</option>
-                  <option value="385">385 — Facture récapitulative</option>
-                  <option value="388">388 — Facture fiscale</option>
-                  <option value="389">389 — Autofacturation (self-billing)</option>
+                  <option value="380">380 - Facture commerciale</option>
+                  <option value="326">326 - Facture partielle</option>
+                  <option value="386">386 - Facture d'acompte</option>
+                  <option value="385">385 - Facture récapitulative</option>
+                  <option value="388">388 - Facture fiscale</option>
+                  <option value="389">389 - Autofacturation (self-billing)</option>
                 </optgroup>
                 <optgroup label="Avoirs">
-                  <option value="381">381 — Avoir</option>
-                  <option value="261">261 — Avoir autofacturé</option>
-                  <option value="296">296 — Avoir d'écart de prix</option>
+                  <option value="381">381 - Avoir</option>
+                  <option value="261">261 - Avoir autofacturé</option>
+                  <option value="296">296 - Avoir d'écart de prix</option>
                 </optgroup>
                 <optgroup label="Autres">
-                  <option value="383">383 — Note de débit</option>
-                  <option value="384">384 — Facture corrective</option>
-                  <option value="382">382 — Note de commission</option>
+                  <option value="383">383 - Note de débit</option>
+                  <option value="384">384 - Facture corrective</option>
+                  <option value="382">382 - Note de commission</option>
                 </optgroup>
               </select>
             </div>
@@ -328,21 +328,14 @@
               <input id="inv_note" class="form-control">
             </div>
 
-            <!-- Champs avoirs — affichés uniquement pour codes 381/261/296 -->
-            <div id="avoirFields" class="col-12" style="display:none">
-              <div class="row g-3 mt-0 p-2 rounded" style="background:rgba(255,61,71,.07);border:1px solid rgba(255,61,71,.25)">
-                <div class="col-12">
-                  <span class="fw-semibold" style="color:var(--bp-red);font-size:.85rem;">↩ Avoir — référence à la facture initiale</span>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">N° facture initiale <span class="badge bg-danger badge-req">BT-25</span></label>
-                  <input id="inv_preceding_ref" class="form-control" placeholder="FACT-202601-001">
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label">Date facture initiale <span class="badge bg-danger badge-req">BT-26</span></label>
-                  <input id="inv_preceding_date" class="form-control" type="date">
-                </div>
-              </div>
+            <!-- Champs avoir (BT-25/BT-26) - affichés inline pour codes 381/261/296 -->
+            <div id="avoirField_ref" class="col-md-4" style="display:none">
+              <label class="form-label">N° facture initiale <span class="badge bg-danger badge-req">BT-25</span></label>
+              <input id="inv_preceding_ref" class="form-control" placeholder="FACT-202601-001">
+            </div>
+            <div id="avoirField_date" class="col-md-3" style="display:none">
+              <label class="form-label">Date facture initiale <span class="badge bg-danger badge-req">BT-26</span></label>
+              <input id="inv_preceding_date" class="form-control" type="date">
             </div>
           </div>
         </div>
@@ -423,8 +416,8 @@
         <div id="buyerSummary" class="card-body py-2 px-3">
           <small class="text-muted">
             <strong>{{ template.buyer.name }}</strong>
-            — TVA {{ template.buyer.vat_id }}
-            — {{ template.buyer.address.postal_zone }} {{ template.buyer.address.city }}, {{ template.buyer.address.country_code }}
+            - TVA {{ template.buyer.vat_id }}
+            - {{ template.buyer.address.postal_zone }} {{ template.buyer.address.city }}, {{ template.buyer.address.country_code }}
           </small>
         </div>
         <div id="buyerSection" class="card-body" style="display:none">
@@ -494,13 +487,13 @@
             <div class="col-md-2">
               <label class="form-label">Mode <span class="badge bg-secondary badge-req">BT-81</span></label>
               <select id="pay_means_code" class="form-select">
-                <option value="30">30 — Virement</option>
-                <option value="10">10 — Espèces</option>
-                <option value="20">20 — Chèque</option>
-                <option value="48">48 — Carte bancaire</option>
-                <option value="49">49 — Prélèvement SEPA</option>
-                <option value="58">58 — SEPA Credit Transfer</option>
-                <option value="97">97 — Compensation</option>
+                <option value="30">30 - Virement</option>
+                <option value="10">10 - Espèces</option>
+                <option value="20">20 - Chèque</option>
+                <option value="48">48 - Carte bancaire</option>
+                <option value="49">49 - Prélèvement SEPA</option>
+                <option value="58">58 - SEPA Credit Transfer</option>
+                <option value="97">97 - Compensation</option>
               </select>
             </div>
             <div class="col-md-4">
@@ -524,7 +517,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
           <span>
             <span class="icon">📋</span>Frais &amp; Remises globaux
-            <span class="badge bg-secondary ms-1" style="font-size:.7em">BG-20/BG-21 — optionnel</span>
+            <span class="badge bg-secondary ms-1" style="font-size:.7em">BG-20/BG-21 -optionnel</span>
           </span>
           <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleSection('chargeBody', this)">Afficher ▼</button>
         </div>
@@ -669,11 +662,11 @@
                 </div>
                 <div id="facturxProfileBlock" style="display:none;margin-top:-.15rem">
                   <select id="facturx_profile" class="form-select form-select-sm" style="min-width:155px" onchange="onProfileChange()">
-                    <option value="EN16931" selected>EN16931 — Standard</option>
-                    <option value="EXTENDED">EXTENDED — Étendu</option>
+                    <option value="EN16931" selected>EN16931 - Standard</option>
+                    <option value="EXTENDED">EXTENDED - Étendu</option>
                     <option value="BASIC">BASIC</option>
-                    <option value="BASICWL">BASIC WL — Sans lignes</option>
-                    <option value="MINIMUM">MINIMUM — Minimal</option>
+                    <option value="BASICWL">BASIC WL - Sans lignes</option>
+                    <option value="MINIMUM">MINIMUM - Minimal</option>
                   </select>
                   <div id="profileHint" class="text-muted mt-1" style="font-size:.72rem;">Factures complètes avec lignes détaillées</div>
                 </div>
@@ -693,34 +686,40 @@
     </div><!-- /tab-generator -->
 
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <!--  ONGLET 2 — VALIDATEUR                                        -->
+    <!--  ONGLET 2 -VALIDATEUR                                        -->
     <!-- ══════════════════════════════════════════════════════════════ -->
     <div class="tab-pane fade" id="tab-validator" role="tabpanel">
 
       <div class="card mb-3">
-        <div class="card-header"><span class="icon">✅</span>Valider un fichier XML de facture</div>
+        <div class="card-header"><span class="icon">✅</span>Valider des factures XML</div>
         <div class="card-body">
 
-          <!-- Zone de dépôt -->
+          <!-- Zone de depot multi-fichiers -->
           <div class="drop-zone" id="dropZone">
             <div class="dz-default">
               <div class="dz-icon">📂</div>
-              <div class="dz-title">Déposez votre fichier XML ici</div>
-              <div class="dz-sub">ou cliquez pour parcourir vos fichiers</div>
-              <div class="dz-sub mt-2" style="font-size:.78rem; color:#9ca3af">
-                Formats supportés : UBL 2.1 (Invoice, CreditNote) · CII D16B (Factur-X, ZUGFeRD)
+              <div class="dz-title">Déposez vos fichiers ici</div>
+              <div class="dz-sub">XML individuels, fichier ZIP ou dossier - cliquez pour sélectionner</div>
+              <div class="dz-sub mt-2" style="font-size:.78rem;color:#9ca3af">
+                Formats supportés : UBL 2.1 (Invoice, CreditNote) · CII D22B (Factur-X, ZUGFeRD)
               </div>
             </div>
             <div class="dz-file" id="dzFileName">
               <span id="dzFileIcon">📄</span>&nbsp;<span id="dzFileNameText"></span>
             </div>
           </div>
-          <input type="file" id="xmlFileInput" accept=".xml,application/xml,text/xml" style="display:none">
+          <!-- Inputs cachés -->
+          <input type="file" id="xmlFileInput" accept=".xml,.zip,application/xml,text/xml,application/zip" multiple style="display:none">
+          <input type="file" id="folderInput" webkitdirectory multiple style="display:none">
 
-          <!-- Bouton valider -->
-          <div class="d-flex align-items-center gap-3 mt-3">
+          <!-- Boutons -->
+          <div class="d-flex align-items-center gap-3 mt-3 flex-wrap">
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    onclick="document.getElementById('folderInput').click()">
+              📁 Sélectionner un dossier
+            </button>
             <button type="button" class="btn btn-primary px-4" id="validateBtn" onclick="runValidation()" disabled>
-              🔍&nbsp; Valider le fichier
+              🔍&nbsp; Valider
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm" id="clearBtn"
                     onclick="clearValidator()" style="display:none">
@@ -728,14 +727,14 @@
             </button>
             <span id="valSpinner" class="d-none">
               <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
-              <span class="text-muted ms-1" style="font-size:.88rem">Validation en cours…</span>
+              <span class="text-muted ms-1" style="font-size:.88rem">Validation en cours...</span>
             </span>
           </div>
 
         </div>
       </div>
 
-      <!-- ── Résultats ── -->
+      <!-- Résultats -->
       <div id="validationResults" style="display:none"></div>
 
     </div><!-- /tab-validator -->
@@ -746,7 +745,7 @@
 <script src="/static/bootstrap.bundle.min.js"></script>
 <script>
 // ════════════════════════════════════════════════════════════════════
-//  ONGLET 1 — GÉNÉRATEUR
+//  ONGLET 1 -GÉNÉRATEUR
 // ════════════════════════════════════════════════════════════════════
 let lineCount = 0;
 
@@ -773,8 +772,10 @@ function onTypeChange() {
   const code    = document.getElementById('inv_type_code').value;
   const isAvoir = _avoirCodes.has(code);
   document.getElementById('pageHeader').className = 'page-header mb-0' + (isAvoir ? ' avoir' : '');
-  document.getElementById('avoirFields').style.display = isAvoir ? '' : 'none';
-  // Effacer les champs avoir si on quitte un type avoir — évite qu'ils
+  ['avoirField_ref', 'avoirField_date'].forEach(id => {
+    document.getElementById(id).style.display = isAvoir ? '' : 'none';
+  });
+  // Effacer les champs avoir si on quitte un type avoir -évite qu'ils
   // se retrouvent dans le XML d'une facture normale
   if (!isAvoir) {
     const pr = document.getElementById('inv_preceding_ref');
@@ -792,7 +793,7 @@ function onTypeChange() {
 
 // ── Sélecteur de pays ─────────────────────────────────────────────────
 function onCountryChange() {
-  // Placeholder — support multi-pays à venir
+  // Placeholder -support multi-pays à venir
   // Pour l'instant France uniquement ; les autres options sont disabled
 }
 
@@ -857,7 +858,7 @@ function showValidationErrors(missing) {
     `<li><span class="fw-semibold">${sec} :</span> ${fields.join(' · ')}</li>`
   ).join('');
   alert.innerHTML = `<div class="alert alert-danger mb-0">
-    <strong>⚠️ Champs obligatoires manquants — veuillez les compléter avant de générer :</strong>
+    <strong>⚠️ Champs obligatoires manquants -veuillez les compléter avant de générer :</strong>
     <ul class="mb-0 mt-2 ps-3">${rows}</ul>
   </div>`;
   alert.style.display = '';
@@ -937,7 +938,7 @@ function addLine(def = {}) {
                value="${price.toFixed(2)}" min="0" step="0.01" oninput="calcLine(this)" style="width:90px"></td>
     <td><input type="number" class="form-control form-control-sm" name="line_base_qty"
                value="" min="1" step="1" placeholder="—" style="width:70px"
-               title="Qté base BT-149 — ex: 100 si PU exprimé pour 100 unités"></td>
+               title="Qté base BT-149 -ex: 100 si PU exprimé pour 100 unités"></td>
     <td><input type="number" class="form-control form-control-sm" name="line_discount"
                value="${disc.toFixed(2)}" min="0" step="0.01" oninput="calcLine(this)" style="width:80px"
                title="Remise ligne (BT-140)"></td>
@@ -1017,7 +1018,7 @@ function updateTotals() {
   document.getElementById('vatBreakdown').innerHTML = Object.values(groups)
     .filter(g => g.taxable !== 0 || g.tax !== 0)
     .map(g => `<div class="d-flex justify-content-between small text-muted mb-1">
-      <span>TVA ${g.cat} ${g.rate > 0 ? g.rate + '%' : '(exo.)'} — base ${fmtEur(g.taxable)}</span>
+      <span>TVA ${g.cat} ${g.rate > 0 ? g.rate + '%' : '(exo.)'} -base ${fmtEur(g.taxable)}</span>
       <span>${fmtEur(g.tax)}</span></div>`).join('');
   window._calc = { lineExt, taxAmt, taxInc, taxExclusive, payable,
                    prepaid: round2(prepaid), groups, chargeTotal, allowanceTotal };
@@ -1030,10 +1031,10 @@ function v(id)     { return (document.getElementById(id)?.value || '').trim(); }
 // ── Profil Factur-X ───────────────────────────────────────────────────
 const _profileHints = {
   'EN16931':  'Factures complètes avec lignes détaillées',
-  'EXTENDED': 'Profil étendu AFNOR — champs additionnels',
-  'BASIC':    'Profil de base — lignes requises',
-  'BASICWL':  'Sans lignes de détail — totaux uniquement',
-  'MINIMUM':  'Profil minimal — données essentielles uniquement',
+  'EXTENDED': 'Profil étendu AFNOR -champs additionnels',
+  'BASIC':    'Profil de base -lignes requises',
+  'BASICWL':  'Sans lignes de détail -totaux uniquement',
+  'MINIMUM':  'Profil minimal -données essentielles uniquement',
 };
 function onFormatChange() {
   const fmt     = document.querySelector('input[name=outputFormat]:checked').value;
@@ -1153,7 +1154,7 @@ document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
       const data = await resp.json();
       const items = (data.errors || []).map(e => `<li class="mb-1">${escHtml(e)}</li>`).join('');
       alert.innerHTML = `<div class="alert alert-danger mb-0">
-        <strong>⚠️ Données invalides — corrigez les erreurs suivantes :</strong>
+        <strong>⚠️ Données invalides -corrigez les erreurs suivantes :</strong>
         <ul class="mb-0 mt-2 ps-3">${items}</ul></div>`;
       alert.style.display = '';
       return;
@@ -1196,20 +1197,17 @@ function escHtml(s) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  ONGLET 2 — VALIDATEUR
+//  ONGLET 2 - VALIDATEUR
 // ════════════════════════════════════════════════════════════════════
 
-// selectedFile conserve le fichier qu'il vienne du drag&drop ou du picker
-let selectedFile = null;
+let selectedFiles = [];
 
-// Initialisation après chargement complet du DOM
 window.addEventListener('load', () => {
   const dropZone    = document.getElementById('dropZone');
   const fileInput   = document.getElementById('xmlFileInput');
-  const validateBtn = document.getElementById('validateBtn');
-  const clearBtn    = document.getElementById('clearBtn');
+  const folderInput = document.getElementById('folderInput');
 
-  // ── Drag & drop ──────────────────────────────────────────────────
+  // Drag & drop
   dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropZone.classList.add('drag-over');
@@ -1220,21 +1218,32 @@ window.addEventListener('load', () => {
   dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
-    if (e.dataTransfer.files.length > 0) setFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files.length > 0) setFiles(e.dataTransfer.files);
   });
 
-  // ── Clic sur la zone → ouvre le sélecteur de fichier ─────────────
   dropZone.addEventListener('click', () => fileInput.click());
 
-  // ── Sélection via le picker natif ────────────────────────────────
   fileInput.addEventListener('change', () => {
-    if (fileInput.files.length > 0) setFile(fileInput.files[0]);
+    if (fileInput.files.length > 0) setFiles(fileInput.files);
+  });
+
+  folderInput.addEventListener('change', () => {
+    if (folderInput.files.length > 0) {
+      const xmlFiles = Array.from(folderInput.files).filter(f => f.name.toLowerCase().endsWith('.xml'));
+      if (xmlFiles.length > 0) setFilesArray(xmlFiles);
+      else alert('Aucun fichier XML trouvé dans ce dossier.');
+    }
   });
 });
 
-function setFile(file) {
-  selectedFile = file;                    // stocke la référence File
-  document.getElementById('dzFileNameText').textContent = file.name;
+function setFiles(fileList) { setFilesArray(Array.from(fileList)); }
+
+function setFilesArray(arr) {
+  selectedFiles = arr;
+  const count = arr.length;
+  const label = count === 1 ? arr[0].name : `${count} fichiers sélectionnés`;
+  document.getElementById('dzFileIcon').textContent    = count > 1 ? '📦' : '📄';
+  document.getElementById('dzFileNameText').textContent = label;
   document.getElementById('dropZone').classList.add('has-file');
   document.getElementById('validateBtn').disabled = false;
   document.getElementById('clearBtn').style.display = '';
@@ -1243,10 +1252,12 @@ function setFile(file) {
 }
 
 function clearValidator() {
-  selectedFile = null;
-  document.getElementById('xmlFileInput').value = '';
+  selectedFiles = [];
+  document.getElementById('xmlFileInput').value  = '';
+  document.getElementById('folderInput').value   = '';
   document.getElementById('dropZone').classList.remove('has-file');
   document.getElementById('dzFileNameText').textContent = '';
+  document.getElementById('dzFileIcon').textContent     = '📄';
   document.getElementById('validateBtn').disabled = true;
   document.getElementById('clearBtn').style.display = 'none';
   document.getElementById('validationResults').innerHTML = '';
@@ -1254,7 +1265,7 @@ function clearValidator() {
 }
 
 async function runValidation() {
-  if (!selectedFile) return;
+  if (!selectedFiles.length) return;
 
   const spinner     = document.getElementById('valSpinner');
   const results     = document.getElementById('validationResults');
@@ -1267,18 +1278,15 @@ async function runValidation() {
 
   try {
     const fd = new FormData();
-    fd.append('file', selectedFile, selectedFile.name);
-    const resp = await fetch('/validate', { method: 'POST', body: fd });
+    for (const f of selectedFiles) fd.append('files[]', f, f.name);
+    const resp = await fetch('/validate-batch', { method: 'POST', body: fd });
     if (!resp.ok) {
       const txt = await resp.text();
       throw new Error(`Serveur : ${txt}`);
     }
     const data = await resp.json();
-    console.log('[validator] data reçu:', data);
-    renderResults(data);
-    console.log('[validator] display après renderResults:', results.style.display);
+    renderBatchResults(data.results || []);
   } catch (err) {
-    console.error('[validator] erreur:', err);
     results.innerHTML = `<div class="alert alert-danger">⚠️ ${escHtml(err.message)}</div>`;
     results.style.display = 'block';
   } finally {
@@ -1287,73 +1295,137 @@ async function runValidation() {
   }
 }
 
-function renderResults(data) {
-  const results = document.getElementById('validationResults');
-  const errors  = data.errors   || [];
-  const warns   = data.warnings || [];
-  const isValid = data.valid;
-
-  const profileLabel = data.profile ? ` · ${escHtml(data.profile)}` : '';
-  const fmtLabel = data.format === 'UBL' ? 'UBL 2.1'
-                 : data.format === 'CII' ? `CII D22B${profileLabel}`
-                 : 'Format inconnu';
-
-  const errCount  = errors.length;
-  const warnCount = warns.length;
-  const countStr  = `${errCount} erreur${errCount !== 1 ? 's' : ''} · ${warnCount} avertissement${warnCount !== 1 ? 's' : ''}`;
-
-  let html = `
-  <div class="card">
-    <div class="result-header ${isValid ? 'valid' : 'invalid'}">
-      <span class="status-badge ${isValid ? 'valid' : 'invalid'}">
-        ${isValid ? '✓ VALIDE' : '✗ NON CONFORME'}
-      </span>
-      <span class="fmt-badge">${escHtml(fmtLabel)}</span>
-      <span class="result-filename">📄 ${escHtml(data.filename || '')}</span>
-      <span class="result-counts">${countStr}</span>
-    </div>`;
-
-  if (!isValid || warnCount > 0) {
-    html += `<div class="card-body p-0">`;
-
-    if (errCount > 0) {
-      html += `<div class="section-label err">Erreurs (${errCount})</div>
-               <ul class="issue-list">`;
-      for (const e of errors) {
-        const loc = e.location ? `<span class="issue-loc">[${escHtml(e.location)}]</span>` : '';
-        html += `<li class="issue-item">
-                   <span class="issue-code-err">${escHtml(e.code)}</span>
-                   <span class="issue-msg">${escHtml(e.message)}${loc}</span>
-                 </li>`;
-      }
-      html += `</ul>`;
-    }
-
-    if (warnCount > 0) {
-      html += `<div class="section-label warn">Avertissements (${warnCount})</div>
-               <ul class="issue-list">`;
-      for (const w of warns) {
-        const loc = w.location ? `<span class="issue-loc">[${escHtml(w.location)}]</span>` : '';
-        html += `<li class="issue-item">
-                   <span class="issue-code-warn">${escHtml(w.code)}</span>
-                   <span class="issue-msg">${escHtml(w.message)}${loc}</span>
-                 </li>`;
-      }
-      html += `</ul>`;
-    }
-
-    html += `</div>`;
-  } else {
-    html += `<div class="result-ok">
-      ✅ Aucune anomalie détectée. La facture est conforme à la norme EN16931 / AFNOR XP Z12-014.
-    </div>`;
+function renderBatchResults(results) {
+  const el = document.getElementById('validationResults');
+  if (!results.length) {
+    el.innerHTML = '<div class="alert alert-warning">Aucun fichier XML trouvé.</div>';
+    el.style.display = 'block';
+    return;
   }
 
-  html += `</div>`;
-  results.innerHTML = html;
-  results.style.display = 'block';
-  console.log('[validator] results.style.display =', results.style.display, '| offsetParent:', results.offsetParent);
-  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const total   = results.length;
+  const valid   = results.filter(r => r.valid).length;
+  const invalid = total - valid;
+
+  let html = `
+  <div class="card mb-3">
+    <div class="card-body py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div style="font-weight:600;font-size:.95rem">
+        ${total} fichier${total > 1 ? 's' : ''} analysé${total > 1 ? 's' : ''}
+        &nbsp;·&nbsp;
+        <span style="color:#15803d">${valid} valide${valid !== 1 ? 's' : ''}</span>
+        ${invalid ? `&nbsp;·&nbsp;<span style="color:#b91c1c">${invalid} non conforme${invalid !== 1 ? 's' : ''}</span>` : ''}
+      </div>
+      <button class="btn btn-outline-secondary btn-sm" onclick="downloadCSV(window._batchResults)">
+        ⬇ Télécharger CSV
+      </button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0" style="font-size:.85rem">
+        <thead class="table-light">
+          <tr>
+            <th style="width:2rem">#</th>
+            <th>Fichier</th>
+            <th>Format</th>
+            <th>Profil</th>
+            <th>Statut</th>
+            <th style="text-align:center">Err.</th>
+            <th style="text-align:center">Avert.</th>
+            <th style="width:2.5rem"></th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+  results.forEach((r, i) => {
+    const fmtLabel  = r.format === 'UBL' ? 'UBL 2.1'
+                    : r.format === 'CII' ? 'CII D22B'
+                    : (r.format || '-');
+    const errCount  = (r.errors   || []).length;
+    const warnCount = (r.warnings || []).length;
+    const detId     = `bd-${i}`;
+    const hasDetail = errCount > 0 || warnCount > 0;
+
+    html += `
+          <tr>
+            <td class="text-muted">${i + 1}</td>
+            <td style="font-family:monospace;word-break:break-all">${escHtml(r.filename || '')}</td>
+            <td>${escHtml(fmtLabel)}</td>
+            <td style="font-size:.78rem;color:#6b7280">${escHtml(r.profile || '-')}</td>
+            <td>
+              <span class="status-badge ${r.valid ? 'valid' : 'invalid'}" style="font-size:.73rem;padding:.15rem .55rem">
+                ${r.valid ? '✓ VALIDE' : '✗ NON CONFORME'}
+              </span>
+            </td>
+            <td style="text-align:center;color:${errCount > 0 ? '#b91c1c' : '#9ca3af'};font-weight:${errCount > 0 ? '600' : '400'}">${errCount}</td>
+            <td style="text-align:center;color:${warnCount > 0 ? '#92400e' : '#9ca3af'};font-weight:${warnCount > 0 ? '600' : '400'}">${warnCount}</td>
+            <td style="text-align:center">
+              ${hasDetail ? `<button class="btn btn-link btn-sm p-0" style="font-size:.8rem;text-decoration:none;color:#6b7280" onclick="toggleDetail('${detId}',this)">▼</button>` : ''}
+            </td>
+          </tr>`;
+
+    if (hasDetail) {
+      html += `
+          <tr id="${detId}" style="display:none;background:#fafafa">
+            <td></td>
+            <td colspan="7" style="padding:.5rem 1rem .75rem">`;
+      if (errCount > 0) {
+        html += `<div class="section-label err mb-1">Erreurs (${errCount})</div><ul class="issue-list">`;
+        for (const e of r.errors) {
+          const loc = e.location ? `<span class="issue-loc">[${escHtml(e.location)}]</span>` : '';
+          html += `<li class="issue-item"><span class="issue-code-err">${escHtml(e.code)}</span><span class="issue-msg">${escHtml(e.message)}${loc}</span></li>`;
+        }
+        html += `</ul>`;
+      }
+      if (warnCount > 0) {
+        html += `<div class="section-label warn mb-1">Avertissements (${warnCount})</div><ul class="issue-list">`;
+        for (const w of r.warnings) {
+          const loc = w.location ? `<span class="issue-loc">[${escHtml(w.location)}]</span>` : '';
+          html += `<li class="issue-item"><span class="issue-code-warn">${escHtml(w.code)}</span><span class="issue-msg">${escHtml(w.message)}${loc}</span></li>`;
+        }
+        html += `</ul>`;
+      }
+      html += `</td></tr>`;
+    }
+  });
+
+  html += `</tbody></table></div></div>`;
+
+  window._batchResults = results;
+  el.innerHTML = html;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleDetail(detId, btn) {
+  const row  = document.getElementById(detId);
+  const open = row.style.display !== 'none';
+  row.style.display = open ? 'none' : '';
+  btn.textContent   = open ? '▼' : '▲';
+}
+
+function downloadCSV(results) {
+  if (!results || !results.length) return;
+  const headers = ['Fichier','Format','Profil','Statut','Nb Erreurs','Nb Avertissements','Erreurs','Avertissements'];
+  const rows = results.map(r => [
+    r.filename || '',
+    r.format   || '',
+    r.profile  || '',
+    r.valid ? 'VALIDE' : 'NON CONFORME',
+    (r.errors   || []).length,
+    (r.warnings || []).length,
+    (r.errors   || []).map(e => `[${e.code}] ${e.message}`).join(' | '),
+    (r.warnings || []).map(w => `[${w.code}] ${w.message}`).join(' | '),
+  ]);
+  const csv = [headers, ...rows]
+    .map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';'))
+    .join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'validation_resultats.csv'; a.click();
+  URL.revokeObjectURL(url);
 }
 </script>
 
