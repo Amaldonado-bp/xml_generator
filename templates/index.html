@@ -368,26 +368,26 @@
             <div class="col-12"><div class="section-muted">Adresse</div></div>
             <div class="col-md-4">
               <label class="form-label">Adresse ligne 1 <span class="badge bg-danger badge-req">BT-35</span></label>
-              <input id="sup_street" class="form-control" required placeholder="1 rue de la Paix">
+              <input id="sup_street" class="form-control" required value="{{ template.supplier.address.street }}">
               <div class="invalid-feedback">Obligatoire</div>
             </div>
             <div class="col-md-3">
               <label class="form-label">Adresse ligne 2 <span class="badge bg-secondary badge-req">BT-36</span></label>
-              <input id="sup_additional_street" class="form-control">
+              <input id="sup_additional_street" class="form-control" value="{{ template.supplier.address.additional_street }}">
             </div>
             <div class="col-md-2">
               <label class="form-label">Code postal <span class="badge bg-danger badge-req">BT-38</span></label>
-              <input id="sup_postal_zone" class="form-control" required placeholder="75001">
+              <input id="sup_postal_zone" class="form-control" required value="{{ template.supplier.address.postal_zone }}">
               <div class="invalid-feedback">Obligatoire</div>
             </div>
             <div class="col-md-2">
               <label class="form-label">Ville <span class="badge bg-danger badge-req">BT-37</span></label>
-              <input id="sup_city" class="form-control" required placeholder="PARIS">
+              <input id="sup_city" class="form-control" required value="{{ template.supplier.address.city }}">
               <div class="invalid-feedback">Obligatoire</div>
             </div>
             <div class="col-md-1">
               <label class="form-label">Pays <span class="badge bg-danger badge-req">BT-40</span></label>
-              <input id="sup_country_code" class="form-control" value="FR" maxlength="2" required>
+              <input id="sup_country_code" class="form-control" value="{{ template.supplier.address.country_code }}" maxlength="2" required>
             </div>
 
             <div class="col-12"><div class="section-muted mt-1">Contact fournisseur (optionnel)</div></div>
