@@ -166,16 +166,17 @@ def validate_data(d: dict, profile: str = "EN16931") -> list:
         if cat in ZERO_VAT_CATS and rate != 0:
             errors.append(f"BT-152 ({lbl}) : Taux TVA doit être 0% pour la catégorie {cat}")
 
-        # BR-CO-03 : net = qty × prix - remise
+        # BR-CO-03 : net = qty × (prix / qté_base) - remise
         try:
             qty      = Decimal(str(line["quantity"]))
             uprice   = Decimal(str(line["unit_price"]))
+            base_qty = Decimal(str(line["base_quantity"])) if line.get("base_quantity") else Decimal("1")
             discount = Decimal(str(line.get("discount", 0)))
             net      = Decimal(str(line["net_amount"]))
-            expected = (qty * uprice - discount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            expected = (qty * uprice / base_qty - discount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             if abs(net - expected) > Decimal("0.02"):
                 errors.append(
-                    f"BR-CO-03 ({lbl}) : Montant net ({net}) ≠ Qté×Prix−Remise ({expected})"
+                    f"BR-CO-03 ({lbl}) : Montant net ({net}) ≠ Qté×(Prix/QtéBase)−Remise ({expected})"
                 )
         except Exception:
             pass
