@@ -565,10 +565,10 @@ def build_cii(d: dict, profile: str = "EN16931") -> str:
         bid  = ET.SubElement(btax, ram("ID"))
         bid.text = buyer["vat_id"]
         bid.set("schemeID", "VA")
+    if inv.get("sales_order_ref"):                                         # BT-14 — avant BuyerOrder dans le schéma CII D22B
+        _t(ET.SubElement(hta, ram("SellerOrderReferencedDocument")), ram("IssuerAssignedID"), inv["sales_order_ref"])
     if inv.get("purchase_order_ref"):
         _t(ET.SubElement(hta, ram("BuyerOrderReferencedDocument")), ram("IssuerAssignedID"), inv["purchase_order_ref"])
-    if inv.get("sales_order_ref"):                                         # BT-14
-        _t(ET.SubElement(hta, ram("SellerOrderReferencedDocument")), ram("IssuerAssignedID"), inv["sales_order_ref"])
     if inv.get("contract_ref"):
         _t(ET.SubElement(hta, ram("ContractReferencedDocument")), ram("IssuerAssignedID"), inv["contract_ref"])
 
