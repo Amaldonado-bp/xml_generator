@@ -315,7 +315,7 @@ def build_ubl(d: dict, profile: str = "EN16931", peppol: bool = False) -> str:
     ple = ET.SubElement(sp, cac("PartyLegalEntity"))
     _t(ple, cbc("RegistrationName"), supplier["name"])
     _t(ple, cbc("CompanyID"), supplier.get("company_id", ""))
-    if supplier.get("contact"):
+    if any(supplier.get("contact", {}).get(k) for k in ("name", "phone", "email")):
         _ubl_contact(sp, supplier["contact"], cac, cbc)
 
     # ── BG-7 Acheteur ────────────────────────────────────────────────
@@ -553,7 +553,7 @@ def build_cii(d: dict, profile: str = "EN16931") -> str:
         vid  = ET.SubElement(stax, ram("ID"))
         vid.text = supplier["vat_id"]
         vid.set("schemeID", "VA")
-    if supplier.get("contact"):
+    if any(supplier.get("contact", {}).get(k) for k in ("name", "phone", "email")):
         _cii_contact(seller_el, supplier["contact"], ram)
     buyer_el = ET.SubElement(hta, ram("BuyerTradeParty"))
     _t(buyer_el, ram("Name"), buyer["name"])
