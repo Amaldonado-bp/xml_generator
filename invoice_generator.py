@@ -310,7 +310,9 @@ def build_ubl(d: dict, profile: str = "EN16931", peppol: bool = False) -> str:
     _ubl_address(sp, supplier.get("address", {}), cac, cbc)
     if supplier.get("vat_id"):
         pts = ET.SubElement(sp, cac("PartyTaxScheme"))
-        _t(pts, cbc("CompanyID"), supplier["vat_id"])
+        cid = ET.SubElement(pts, cbc("CompanyID"))
+        cid.text = supplier["vat_id"]
+        cid.set("schemeID", "VAT")
         _t(ET.SubElement(pts, cac("TaxScheme")), cbc("ID"), "VAT")
     ple = ET.SubElement(sp, cac("PartyLegalEntity"))
     _t(ple, cbc("RegistrationName"), supplier["name"])
@@ -330,7 +332,9 @@ def build_ubl(d: dict, profile: str = "EN16931", peppol: bool = False) -> str:
     _ubl_address(bp, buyer.get("address", {}), cac, cbc)
     if buyer.get("vat_id"):
         pts2 = ET.SubElement(bp, cac("PartyTaxScheme"))
-        _t(pts2, cbc("CompanyID"), buyer["vat_id"])
+        cid2 = ET.SubElement(pts2, cbc("CompanyID"))
+        cid2.text = buyer["vat_id"]
+        cid2.set("schemeID", "VAT")
         _t(ET.SubElement(pts2, cac("TaxScheme")), cbc("ID"), "VAT")
     ple2 = ET.SubElement(bp, cac("PartyLegalEntity"))
     _t(ple2, cbc("RegistrationName"), buyer["name"])
