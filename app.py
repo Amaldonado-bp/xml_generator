@@ -183,17 +183,17 @@ def validate_batch():
 
 
 _CSV_HEADERS = [
-    "format", "profile", "invoice_id", "invoice_date", "due_date",
-    "type_code", "currency", "buyer_reference", "purchase_order_ref",
+    "format*", "profile*", "invoice_id*", "invoice_date*", "due_date",
+    "type_code*", "currency*", "buyer_reference*", "purchase_order_ref",
     "sales_order_ref", "contract_ref", "payment_terms", "payment_means", "iban",
     "preceding_ref", "preceding_date", "note",
-    "supplier_name", "supplier_vat", "supplier_company_id",
+    "supplier_name*", "supplier_vat*", "supplier_company_id",
     "supplier_street", "supplier_city", "supplier_postal", "supplier_country",
-    "buyer_name", "buyer_vat", "buyer_company_id",
+    "buyer_name*", "buyer_vat", "buyer_company_id",
     "buyer_street", "buyer_city", "buyer_postal", "buyer_country", "buyer_endpoint",
-    "line_id", "line_name", "line_description",
-    "line_qty", "line_unit", "line_unit_price", "line_base_qty",
-    "line_discount", "line_vat_category", "line_vat_rate",
+    "line_id*", "line_name*", "line_description",
+    "line_qty*", "line_unit", "line_unit_price*", "line_base_qty",
+    "line_discount", "line_vat_category*", "line_vat_rate*",
 ]
 
 _CSV_EXAMPLES = [
@@ -331,11 +331,13 @@ def generate_batch_csv():
 
     delim = _detect_delimiter(text)
     reader = csv.DictReader(io.StringIO(text), delimiter=delim)
+    # Normalise les en-têtes : supprime le '*' des colonnes obligatoires
+    all_rows = [{k.strip().rstrip("*"): v for k, v in row.items()} for row in reader]
 
     # Regroupe les lignes par invoice_id (conserve l'ordre d'apparition)
     invoices = {}
     order    = []
-    for row in reader:
+    for row in all_rows:
         inv_id = (row.get("invoice_id") or "").strip()
         if not inv_id:
             continue
