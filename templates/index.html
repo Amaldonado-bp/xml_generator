@@ -245,6 +245,13 @@
           ✅ Validateur XML
         </button>
       </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-batch-btn"
+                data-bs-toggle="tab" data-bs-target="#tab-batch"
+                type="button" role="tab">
+          📦 Génération en masse
+        </button>
+      </li>
     </ul>
   </div>
 
@@ -738,6 +745,127 @@
       <div id="validationResults" style="display:none"></div>
 
     </div><!-- /tab-validator -->
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!--  ONGLET 3 -GÉNÉRATION EN MASSE                                -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="tab-pane fade" id="tab-batch" role="tabpanel">
+
+      <div class="card mb-3">
+        <div class="card-header"><span class="icon">📦</span>Génération en masse depuis CSV</div>
+        <div class="card-body">
+
+          <!-- Étape 1 : télécharger le template -->
+          <div class="mb-4">
+            <h6 class="fw-semibold mb-1">Étape 1 - Télécharger le template CSV</h6>
+            <p class="text-muted small mb-2">
+              Le fichier CSV contient une ligne par ligne de facture. Les champs facture (id, date, fournisseur…)
+              se répètent sur chaque ligne. Plusieurs factures dans un même fichier sont séparées par leur <code>invoice_id</code>.
+            </p>
+            <a href="/template-csv" class="btn btn-outline-secondary btn-sm">
+              ⬇️ Télécharger le template CSV
+            </a>
+          </div>
+
+          <hr class="my-3">
+
+          <!-- Étape 2 : uploader le CSV rempli -->
+          <div class="mb-3">
+            <h6 class="fw-semibold mb-2">Étape 2 - Uploader votre CSV et générer les XML</h6>
+            <div class="drop-zone" id="batchDropZone" onclick="document.getElementById('batchCsvInput').click()">
+              <div class="dz-default" id="batchDzDefault">
+                <div class="dz-icon">📄</div>
+                <div class="dz-title">Déposez votre fichier CSV ici</div>
+                <div class="dz-sub">ou cliquez pour sélectionner</div>
+              </div>
+              <div class="dz-file" id="batchDzFile" style="display:none">
+                <span id="batchDzIcon">📄</span>&nbsp;<span id="batchDzName"></span>
+              </div>
+            </div>
+            <input type="file" id="batchCsvInput" accept=".csv,text/csv" style="display:none">
+          </div>
+
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <button type="button" class="btn btn-primary px-4" id="batchGenBtn"
+                    onclick="runBatchGenerate()" disabled>
+              ⚡ Générer les XML
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="batchClearBtn"
+                    onclick="clearBatch()" style="display:none">
+              Effacer
+            </button>
+            <span id="batchSpinner" class="text-muted small d-none">⏳ Génération en cours…</span>
+          </div>
+
+          <!-- Résultats -->
+          <div id="batchResults" class="mt-4" style="display:none"></div>
+
+        </div>
+      </div>
+
+      <!-- Aide sur les colonnes -->
+      <div class="card mb-3">
+        <div class="card-header" style="cursor:pointer"
+             onclick="document.getElementById('csvHelp').classList.toggle('d-none')">
+          <span class="icon">ℹ️</span>Description des colonnes CSV
+          <span class="float-end text-muted small">cliquer pour afficher/masquer</span>
+        </div>
+        <div class="card-body d-none" id="csvHelp">
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered small">
+              <thead class="table-light">
+                <tr><th>Colonne</th><th>Description</th><th>Exemple</th><th>Obligatoire</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>format</code></td><td>Format XML de sortie</td><td>cii / ubl</td><td>✅</td></tr>
+                <tr><td><code>profile</code></td><td>Profil EN16931</td><td>EN16931</td><td>✅</td></tr>
+                <tr><td><code>invoice_id</code></td><td>Numéro de facture (regroupe les lignes)</td><td>INV-001</td><td>✅</td></tr>
+                <tr><td><code>invoice_date</code></td><td>Date d'émission</td><td>2026-06-26</td><td>✅</td></tr>
+                <tr><td><code>due_date</code></td><td>Date d'échéance</td><td>2026-07-26</td><td></td></tr>
+                <tr><td><code>type_code</code></td><td>380=facture, 381=avoir, 384=corrective</td><td>380</td><td>✅</td></tr>
+                <tr><td><code>currency</code></td><td>Code monnaie ISO 4217</td><td>EUR</td><td>✅</td></tr>
+                <tr><td><code>buyer_reference</code></td><td>Référence acheteur (BT-10)</td><td>REF-ACH</td><td>✅</td></tr>
+                <tr><td><code>purchase_order_ref</code></td><td>N° bon de commande (BT-13)</td><td>PO-12345</td><td></td></tr>
+                <tr><td><code>sales_order_ref</code></td><td>N° commande vendeur (BT-14)</td><td>SO-5678</td><td></td></tr>
+                <tr><td><code>contract_ref</code></td><td>N° contrat (BT-12)</td><td>CTR-99</td><td></td></tr>
+                <tr><td><code>payment_terms</code></td><td>Conditions de paiement (BT-20)</td><td>30 jours nets</td><td></td></tr>
+                <tr><td><code>payment_means</code></td><td>Moyen de paiement (BT-81)</td><td>30</td><td></td></tr>
+                <tr><td><code>iban</code></td><td>IBAN (BT-84)</td><td>FR76…</td><td></td></tr>
+                <tr><td><code>preceding_ref</code></td><td>N° facture initiale pour avoir (BT-25)</td><td>INV-001</td><td>si avoir</td></tr>
+                <tr><td><code>preceding_date</code></td><td>Date facture initiale (BT-26)</td><td>2026-06-01</td><td>si avoir</td></tr>
+                <tr><td><code>note</code></td><td>Note libre (BT-22)</td><td></td><td></td></tr>
+                <tr class="table-light"><td colspan="4"><strong>Fournisseur</strong></td></tr>
+                <tr><td><code>supplier_name</code></td><td>Nom fournisseur (BT-27)</td><td>Mon Entreprise SAS</td><td>✅</td></tr>
+                <tr><td><code>supplier_vat</code></td><td>N° TVA fournisseur (BT-31)</td><td>FR12345678901</td><td>✅</td></tr>
+                <tr><td><code>supplier_company_id</code></td><td>SIRET / ID légal (BT-30)</td><td>123456789</td><td></td></tr>
+                <tr><td><code>supplier_street</code></td><td>Adresse</td><td>1 rue de la Paix</td><td></td></tr>
+                <tr><td><code>supplier_city</code></td><td>Ville</td><td>PARIS</td><td></td></tr>
+                <tr><td><code>supplier_postal</code></td><td>Code postal</td><td>75001</td><td></td></tr>
+                <tr><td><code>supplier_country</code></td><td>Pays ISO 3166-1 alpha-2</td><td>FR</td><td></td></tr>
+                <tr class="table-light"><td colspan="4"><strong>Acheteur</strong></td></tr>
+                <tr><td><code>buyer_name</code></td><td>Nom acheteur (BT-44)</td><td>Client SAS</td><td>✅</td></tr>
+                <tr><td><code>buyer_vat</code></td><td>N° TVA acheteur (BT-48)</td><td>FR98765432109</td><td></td></tr>
+                <tr><td><code>buyer_company_id</code></td><td>SIRET acheteur (BT-47)</td><td>987654321</td><td></td></tr>
+                <tr><td><code>buyer_street/city/postal/country</code></td><td>Adresse acheteur</td><td></td><td></td></tr>
+                <tr><td><code>buyer_endpoint</code></td><td>Endpoint électronique (BT-49)</td><td></td><td></td></tr>
+                <tr class="table-light"><td colspan="4"><strong>Ligne de facture</strong> (une ligne CSV = une ligne de facture)</td></tr>
+                <tr><td><code>line_id</code></td><td>Numéro de ligne</td><td>1</td><td>✅</td></tr>
+                <tr><td><code>line_name</code></td><td>Désignation (BT-153)</td><td>Prestation</td><td>✅</td></tr>
+                <tr><td><code>line_description</code></td><td>Description détaillée</td><td></td><td></td></tr>
+                <tr><td><code>line_qty</code></td><td>Quantité (BT-129)</td><td>5</td><td>✅</td></tr>
+                <tr><td><code>line_unit</code></td><td>Unité UN/ECE</td><td>HUR / EA / C62</td><td></td></tr>
+                <tr><td><code>line_unit_price</code></td><td>Prix unitaire HT (BT-146)</td><td>150.00</td><td>✅</td></tr>
+                <tr><td><code>line_base_qty</code></td><td>Qté base prix (BT-149), ex: 1000 si prix pour 1000 unités</td><td>1000</td><td></td></tr>
+                <tr><td><code>line_discount</code></td><td>Remise sur ligne en euros (BT-136)</td><td>0</td><td></td></tr>
+                <tr><td><code>line_vat_category</code></td><td>Catégorie TVA</td><td>S / Z / E / AE</td><td>✅</td></tr>
+                <tr><td><code>line_vat_rate</code></td><td>Taux TVA %</td><td>20</td><td>✅</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-batch -->
 
   </div><!-- /tab-content -->
 </div><!-- /container -->
@@ -1429,6 +1557,110 @@ function downloadCSV(results) {
   const a    = document.createElement('a');
   a.href = url; a.download = 'validation_resultats.csv'; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  ONGLET 3 - GÉNÉRATION EN MASSE
+// ════════════════════════════════════════════════════════════════════
+let _batchFile = null;
+
+(function initBatch() {
+  const input   = document.getElementById('batchCsvInput');
+  const dropZone = document.getElementById('batchDropZone');
+
+  input.addEventListener('change', () => {
+    if (input.files[0]) setBatchFile(input.files[0]);
+  });
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.toLowerCase().endsWith('.csv')) setBatchFile(f);
+  });
+})();
+
+function setBatchFile(f) {
+  _batchFile = f;
+  document.getElementById('batchDzDefault').style.display = 'none';
+  document.getElementById('batchDzFile').style.display    = '';
+  document.getElementById('batchDzName').textContent      = f.name;
+  document.getElementById('batchGenBtn').disabled         = false;
+  document.getElementById('batchClearBtn').style.display  = '';
+  document.getElementById('batchResults').style.display   = 'none';
+  document.getElementById('batchResults').innerHTML       = '';
+}
+
+function clearBatch() {
+  _batchFile = null;
+  document.getElementById('batchCsvInput').value          = '';
+  document.getElementById('batchDzDefault').style.display = '';
+  document.getElementById('batchDzFile').style.display    = 'none';
+  document.getElementById('batchDzName').textContent      = '';
+  document.getElementById('batchGenBtn').disabled         = true;
+  document.getElementById('batchClearBtn').style.display  = 'none';
+  document.getElementById('batchResults').style.display   = 'none';
+  document.getElementById('batchResults').innerHTML       = '';
+}
+
+async function runBatchGenerate() {
+  if (!_batchFile) return;
+
+  const btn     = document.getElementById('batchGenBtn');
+  const spinner = document.getElementById('batchSpinner');
+  const results = document.getElementById('batchResults');
+
+  btn.disabled      = true;
+  spinner.classList.remove('d-none');
+  results.style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('csv_file', _batchFile, _batchFile.name);
+
+    const resp = await fetch('/generate-batch-csv', { method: 'POST', body: fd });
+
+    if (resp.ok) {
+      const summary = resp.headers.get('X-Batch-Summary');
+      let ok = 0, errs = 0;
+      if (summary) {
+        try { const s = JSON.parse(summary); ok = s.ok || 0; errs = s.errors || 0; } catch {}
+      }
+
+      const zipBlob = await resp.blob();
+      const url     = URL.createObjectURL(zipBlob);
+      const a       = document.createElement('a');
+      a.href = url; a.download = 'factures_xml.zip'; a.click();
+      URL.revokeObjectURL(url);
+
+      let html = `<div class="alert alert-success">
+        ✅ <strong>${ok} facture${ok > 1 ? 's' : ''} générée${ok > 1 ? 's' : ''}</strong> — ZIP téléchargé.`;
+      if (errs > 0) html += ` <br><span class="text-warning">⚠️ ${errs} facture${errs > 1 ? 's' : ''} en erreur — voir <code>_rapport_erreurs.json</code> dans le ZIP.</span>`;
+      html += '</div>';
+      results.innerHTML       = html;
+      results.style.display   = '';
+
+    } else {
+      const ct   = resp.headers.get('Content-Type') || '';
+      let errMsg = 'Erreur serveur';
+      if (ct.includes('json')) {
+        const data = await resp.json();
+        errMsg = data.error || JSON.stringify(data);
+      } else {
+        errMsg = await resp.text();
+      }
+      results.innerHTML     = `<div class="alert alert-danger">❌ ${errMsg}</div>`;
+      results.style.display = '';
+    }
+  } catch (err) {
+    results.innerHTML     = `<div class="alert alert-danger">❌ Erreur réseau : ${err.message}</div>`;
+    results.style.display = '';
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('d-none');
+  }
 }
 </script>
 
